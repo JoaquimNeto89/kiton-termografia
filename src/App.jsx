@@ -688,7 +688,7 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
     <div>
       {/* Cards resumo */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
-        {[{l:"Relatórios",v:st.total,i:"REL",c:"#CD0000"},{l:"Clientes Cadastrados",v:st.clientes,i:"CLI",c:"#3b82f6"}].map(s=>(
+        {[{l:"Relatórios",v:st.total,i:"📋",c:"#CD0000"},{l:"Clientes Cadastrados",v:st.clientes,i:"🏭",c:"#3b82f6"}].map(s=>(
           <div key={s.l} style={{background:"#0f1422",border:"1px solid #1f2937",borderTop:"3px solid "+s.c,borderRadius:10,padding:"16px 20px"}}>
             <div style={{fontSize:22,marginBottom:4}}>{s.i}</div>
             <div style={{fontSize:28,fontWeight:800,color:s.c,fontFamily:"'Barlow Condensed',sans-serif",lineHeight:1}}>{s.v}</div>
