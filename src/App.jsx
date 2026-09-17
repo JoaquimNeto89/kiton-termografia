@@ -665,7 +665,7 @@ function CadClientes({ items, onSave, onDelete }) {
         </div>
       )}
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {items.map(item=>(
+        {[...items].sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(item=>(
           <div key={item.id} style={{background:"#0f1422",border:"1px solid #1f2937",borderRadius:10,overflow:"hidden"}}>
             <div style={{padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",cursor:"pointer"}} onClick={()=>setExpanded(expanded===item.id?null:item.id)}>
               <div style={{flex:1,minWidth:0}}>
@@ -847,7 +847,7 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
           const rs = (data.relatorios||[]).filter(r=>r.cliente===cli.nome);
           const ps = rs.flatMap(r=>r.pontos||[]);
           return {nome:cli.nome, total:rs.length, crit:ps.filter(p=>p.severidade==="critico").length, alert:ps.filter(p=>p.severidade==="alerta").length, norm:ps.filter(p=>p.severidade==="normal").length};
-        }).filter(c=>c.total>0);
+        });
         if(!clis.length) return null;
     return (
 
