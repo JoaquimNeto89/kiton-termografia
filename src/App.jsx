@@ -624,6 +624,203 @@ function Cadastros({ cadastros, onSave, onDelete, tab, setTab }) {
   );
 }
 
+// ─── CADASTRO CLIENTES ───────────────────────────────────────────────────────
+function CadClientes({ items, onSave, onDelete }) {
+  const empty = {id:"",nome:"",cnpj:"",ie:"",responsavel:"",cargo:"",telefone:"",email:"",site:"",cep:"",logradouro:"",numero:"",complemento:"",bairro:"",cidade:"",uf:"",obs:"",equipamentos:[]};
+  const [form,setForm] = useState(null);
+  const [expanded,setExpanded] = useState(null);
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  function buscaCep(cep) {
+    const c = cep.replace(/[^0-9]/g,"");
+    if(c.length!==8) return;
+    fetch("https://viacep.com.br/ws/"+c+"/json/").then(r=>r.json()).then(d=>{if(!d.erro){set("logradouro",d.logradouro||"");set("bairro",d.bairro||"");set("cidade",d.localidade||"");set("uf",d.uf||"");}}).catch(()=>{});
+  }
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:"#f1f5f9"}}>{items.length} cliente(s)</div>
+        <Btn primary onClick={()=>setForm({...empty,id:Date.now()+""})}>＋ Novo Cliente</Btn>
+      </div>
+      {form && (
+        <div style={{background:"#0f1422",border:"1px solid #CD0000",borderRadius:10,padding:20,marginBottom:20}}>
+          <ST style={{marginBottom:16}}>Dados do Cliente</ST>
+          <div style={{fontSize:11,fontWeight:700,color:"#CD0000",textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>📋 Identificação</div>
+          <G2 mb={12}><F l="Nome / Razão Social *" v={form.nome||""} s={v=>set("nome",v)} ph="Ex: Indústria Exemplo Ltda"/><F l="CNPJ / CPF *" v={form.cnpj||""} s={v=>set("cnpj",v)} ph="Ex: 00.000.000/0001-00"/></G2>
+          <G3 mb={14}><F l="Inscrição Estadual" v={form.ie||""} s={v=>set("ie",v)} ph="Ex: 123456789"/><F l="Responsável / Contato" v={form.responsavel||""} s={v=>set("responsavel",v)} ph="Nome do contato"/><F l="Cargo / Função" v={form.cargo||""} s={v=>set("cargo",v)} ph="Ex: Gerente de Manutenção"/></G3>
+          <G3 mb={14}><F l="Telefone / WhatsApp" v={form.telefone||""} s={v=>set("telefone",v)} ph="Ex: (44) 99999-9999"/><F l="E-mail" v={form.email||""} s={v=>set("email",v)} ph="Ex: contato@empresa.com.br"/><F l="Site" v={form.site||""} s={v=>set("site",v)} ph="Ex: www.empresa.com.br"/></G3>
+          <div style={{fontSize:11,fontWeight:700,color:"#CD0000",textTransform:"uppercase",letterSpacing:.8,marginBottom:10,borderTop:"1px solid #1f2937",paddingTop:14}}>📍 Endereço</div>
+          <div style={{display:"grid",gridTemplateColumns:"160px 1fr 80px",gap:10,marginBottom:10}}>
+            <div><label>CEP *</label><input value={form.cep||""} placeholder="Ex: 87000-000" onChange={e=>set("cep",e.target.value)} onBlur={e=>buscaCep(e.target.value)}/></div>
+            <F l="Logradouro *" v={form.logradouro||""} s={v=>set("logradouro",v)} ph="Rua, Av..."/>
+            <F l="Número *" v={form.numero||""} s={v=>set("numero",v)} ph="100"/>
+          </div>
+          <G3 mb={14}><F l="Complemento" v={form.complemento||""} s={v=>set("complemento",v)} ph="Sala, Bloco..."/><F l="Bairro" v={form.bairro||""} s={v=>set("bairro",v)} ph="Ex: Jardim Canadá"/><div style={{display:"grid",gridTemplateColumns:"1fr 60px",gap:8}}><F l="Cidade" v={form.cidade||""} s={v=>set("cidade",v)} ph="Ex: Maringá"/><F l="UF" v={form.uf||""} s={v=>set("uf",v)} ph="PR"/></div></G3>
+          <div style={{marginBottom:14}}><label>Observações</label><textarea rows={2} value={form.obs||""} onChange={e=>set("obs",e.target.value)} placeholder="Informações adicionais..." style={{resize:"vertical"}}/></div>
+          <div style={{fontSize:11,fontWeight:700,color:"#CD0000",textTransform:"uppercase",letterSpacing:.8,marginBottom:10,borderTop:"1px solid #1f2937",paddingTop:14}}>⚙️ Equipamentos deste Cliente</div>
+          <CadEquipamentos items={form.equipamentos||[]} onChange={eqs=>setForm(f=>({...f,equipamentos:eqs}))}/>
+          <div style={{display:"flex",gap:8,marginTop:16}}>
+            <Btn success onClick={()=>{if(!form.nome||!form.cnpj){alert("Nome e CNPJ são obrigatórios");return;}if(!form.logradouro||!form.numero){alert("Endereço é obrigatório");return;}onSave(form);setForm(null);}}>✅ Salvar</Btn>
+            <Btn onClick={()=>setForm(null)}>Cancelar</Btn>
+          </div>
+        </div>
+      )}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {items.map(item=>(
+          <div key={item.id} style={{background:"#0f1422",border:"1px solid #1f2937",borderRadius:10,overflow:"hidden"}}>
+            <div style={{padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",cursor:"pointer"}} onClick={()=>setExpanded(expanded===item.id?null:item.id)}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,color:"#f1f5f9",fontSize:15}}>{item.nome}</div>
+                <div style={{fontSize:12,color:"#4b5563",marginTop:2}}>{item.cnpj&&`CNPJ: ${item.cnpj} · `}{item.cidade&&`${item.cidade}${item.uf?"/"+item.uf:""} · `}{(item.equipamentos||[]).length} equip.</div>
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <span style={{fontSize:12,color:"#4b5563"}}>{expanded===item.id?"▲":"▼"}</span>
+                <Btn small onClick={e=>{e.stopPropagation();setForm({...item,equipamentos:item.equipamentos||[]})}}>✏️</Btn>
+                <Btn small danger onClick={e=>{e.stopPropagation();onDelete(item.id)}}>🗑️</Btn>
+              </div>
+            </div>
+            {expanded===item.id && (
+              <div style={{padding:"12px 20px 16px",borderTop:"1px solid #1f2937",background:"#080b13"}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8,fontSize:12,color:"#6b7280"}}>
+                  {item.responsavel&&<div><b style={{color:"#94a3b8"}}>Responsável:</b> {item.responsavel}{item.cargo?" ("+item.cargo+")":""}</div>}
+                  {item.telefone&&<div><b style={{color:"#94a3b8"}}>Tel:</b> {item.telefone}</div>}
+                  {item.email&&<div><b style={{color:"#94a3b8"}}>E-mail:</b> {item.email}</div>}
+                  {item.logradouro&&<div style={{gridColumn:"1/-1"}}><b style={{color:"#94a3b8"}}>Endereço:</b> {[item.logradouro,item.numero,item.complemento,item.bairro,item.cidade&&(item.cidade+(item.uf?"/"+item.uf:""))].filter(Boolean).join(", ")}</div>}
+                  {item.obs&&<div style={{gridColumn:"1/-1"}}><b style={{color:"#94a3b8"}}>Obs:</b> {item.obs}</div>}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CadEquipamentos({ items, onChange }) {
+  const emptyEq = () => ({id:Date.now()+"",tag:"",nome:"",tipo:"",periodicidade:"",localizacao:"",codigoArea:""});
+  const [form,setForm] = useState(null);
+  const setF = (k,v) => setForm(f=>({...f,[k]:v}));
+  const periodOpts = ["Mensal","Bimestral","Trimestral","Semestral","Anual","Sob demanda"];
+  return (
+    <div style={{background:"#080b13",borderRadius:8,padding:16}}>
+      {form && (
+        <div style={{background:"#0f1422",border:"1px solid #1e3a5f",borderRadius:8,padding:14,marginBottom:12}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10,marginBottom:10}}>
+            <F l="TAG" v={form.tag} s={v=>setF("tag",v)} ph="Ex: QD-01"/>
+            <F l="Identificação *" v={form.nome} s={v=>setF("nome",v)} ph="Ex: Quadro Geral"/>
+            <FS l="Tipo" v={form.tipo} s={v=>setF("tipo",v)} opts={TIPOS}/>
+            <FS l="Periodicidade" v={form.periodicidade} s={v=>setF("periodicidade",v)} opts={periodOpts}/>
+            <F l="Localização" v={form.localizacao} s={v=>setF("localizacao",v)} ph="Ex: Sala Elétrica"/>
+            <F l="Código de Área" v={form.codigoArea} s={v=>setF("codigoArea",v)} ph="Ex: P1"/>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <Btn success small onClick={()=>{if(!form.nome){alert("Informe a identificação");return;}const exists=items.find(x=>x.id===form.id);onChange(exists?items.map(x=>x.id===form.id?form:x):[...items,form]);setForm(null);}}>✅ Salvar</Btn>
+            <Btn small onClick={()=>setForm(null)}>Cancelar</Btn>
+          </div>
+        </div>
+      )}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <span style={{fontSize:12,color:"#4b5563"}}>{items.length} equipamento(s)</span>
+        <Btn small style={{borderColor:"#3b82f6",color:"#60a5fa"}} onClick={()=>setForm(emptyEq())}>＋ Equipamento</Btn>
+      </div>
+      {items.map(eq=>(
+        <div key={eq.id} style={{background:"#0a1628",borderRadius:6,padding:"8px 12px",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+          <div style={{flex:1,fontSize:12}}>
+            {eq.tag&&<span style={{color:"#f59e0b",fontWeight:700,marginRight:8}}>{eq.tag}</span>}
+            <span style={{color:"#f1f5f9",fontWeight:600}}>{eq.nome}</span>
+            <span style={{color:"#4b5563",marginLeft:6}}>{eq.tipo}{eq.periodicidade?" · "+eq.periodicidade:""}</span>
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <Btn small onClick={()=>setForm({...eq})}>✏️</Btn>
+            <Btn small danger onClick={()=>onChange(items.filter(x=>x.id!==eq.id))}>🗑️</Btn>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CadInstrumentos({ items, onSave, onDelete }) {
+  const tiposInstr = ["Câmera Termográfica","Anemômetro","Termômetro","Medidor de Umidade","Termopar","Multímetro","Alicate Amperímetro","Outro"];
+  const empty = {id:"",tipo:"",fabricante:"",modelo:"",serie:"",tag:"",calibracao:""};
+  const [form,setForm] = useState(null);
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:"#f1f5f9"}}>{items.length} instrumento(s)</div>
+        <Btn primary onClick={()=>setForm({...empty,id:Date.now()+""})}>＋ Novo Instrumento</Btn>
+      </div>
+      {form && (
+        <div style={{background:"#0f1422",border:"1px solid #CD0000",borderRadius:10,padding:20,marginBottom:20}}>
+          <ST style={{marginBottom:16}}>Dados do Instrumento</ST>
+          <G3 mb={12}><FS l="Tipo *" v={form.tipo||""} s={v=>set("tipo",v)} opts={tiposInstr}/><F l="Fabricante *" v={form.fabricante||""} s={v=>set("fabricante",v)} ph="Ex: FLIR"/><F l="Modelo *" v={form.modelo||""} s={v=>set("modelo",v)} ph="Ex: E8-XT"/></G3>
+          <G3 mb={0}><F l="Nº de Série" v={form.serie||""} s={v=>set("serie",v)} ph="Ex: 639114962XT"/><F l="TAG / Identificação" v={form.tag||""} s={v=>set("tag",v)} ph="Ex: CAM-01"/><F l="Data de Calibração" t="date" v={form.calibracao||""} s={v=>set("calibracao",v)}/></G3>
+          <div style={{display:"flex",gap:8,marginTop:16}}>
+            <Btn success onClick={()=>{if(!form.tipo||!form.fabricante||!form.modelo){alert("Preencha tipo, fabricante e modelo");return;}onSave(form);setForm(null);}}>✅ Salvar</Btn>
+            <Btn onClick={()=>setForm(null)}>Cancelar</Btn>
+          </div>
+        </div>
+      )}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {items.map(item=>(
+          <div key={item.id} style={{background:"#0f1422",border:"1px solid #1f2937",borderRadius:10,padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
+                <span style={{fontSize:11,background:"#1e3a5f",color:"#60a5fa",padding:"2px 8px",borderRadius:12,fontWeight:700}}>{item.tipo||"Instrumento"}</span>
+                {item.tag&&<span style={{fontSize:11,color:"#f59e0b",fontWeight:700}}>{item.tag}</span>}
+              </div>
+              <div style={{fontWeight:700,color:"#f1f5f9"}}>{item.fabricante} {item.modelo}</div>
+              <div style={{fontSize:12,color:"#4b5563",marginTop:2}}>{item.serie&&`Série: ${item.serie}`}{item.calibracao&&` · Calibração: ${fmtDate(item.calibracao)}`}</div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <Btn small onClick={()=>setForm({...item})}>✏️</Btn>
+              <Btn small danger onClick={()=>onDelete(item.id)}>🗑️</Btn>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CadTecnicos({ items, onSave, onDelete }) {
+  const empty = {id:"",nome:"",crea:""};
+  const [form,setForm] = useState(null);
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:"#f1f5f9"}}>{items.length} técnico(s)</div>
+        <Btn primary onClick={()=>setForm({...empty,id:Date.now()+""})}>＋ Novo Técnico</Btn>
+      </div>
+      {form && (
+        <div style={{background:"#0f1422",border:"1px solid #CD0000",borderRadius:10,padding:20,marginBottom:20}}>
+          <G2 mb={0}><F l="Nome Completo *" v={form.nome} s={v=>set("nome",v)} ph="Ex: Joaquim Bernardes"/><F l="CREA" v={form.crea||""} s={v=>set("crea",v)} ph="Ex: 153435/D"/></G2>
+          <div style={{display:"flex",gap:8,marginTop:16}}>
+            <Btn success onClick={()=>{if(!form.nome){alert("Informe o nome");return;}onSave(form);setForm(null);}}>✅ Salvar</Btn>
+            <Btn onClick={()=>setForm(null)}>Cancelar</Btn>
+          </div>
+        </div>
+      )}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {items.map(item=>(
+          <div key={item.id} style={{background:"#0f1422",border:"1px solid #1f2937",borderRadius:10,padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,color:"#f1f5f9"}}>{item.nome}</div>
+              {item.crea&&<div style={{fontSize:12,color:"#4b5563",marginTop:2}}>CREA-PR {item.crea}</div>}
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <Btn small onClick={()=>setForm({...item})}>✏️</Btn>
+              <Btn small danger onClick={()=>onDelete(item.id)}>🗑️</Btn>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecnicos:[]}}, onNew, onEdit, onDelete, onCompar, onPdf, onJpg }) {
   const [filtro,setFiltro] = useState("todos");
