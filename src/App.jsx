@@ -569,105 +569,81 @@ ${pageUltima}
 }
 
 function exportPDF(rel, todosRelatorios) {
-  const htmlBase = buildReportHTML(rel, todosRelatorios);
-  // Injetar script de impressão automática ao abrir
-  const ST  = "<"+"scr"+"ipt>";
-  const SET = "<"+"/scr"+"ipt>";
-  const printScript = ST+'window.addEventListener("load",function(){setTimeout(function(){window.print();},800);});'+SET;
-  const html = htmlBase.replace("</body>", printScript+"\n</body>");
-  const blob = new Blob([html], {type:"text/html;charset=utf-8"});
-  const url  = URL.createObjectURL(blob);
-  // Abrir em nova aba (mais confiável para impressão do que download)
-  const win = window.open(url, "_blank");
-  if (!win) {
-    // fallback: baixar o arquivo
+  try {
+    const htmlBase = buildReportHTML(rel, todosRelatorios);
+    const ST  = "<"+"scr"+"ipt>";
+    const SET = "<"+"/scr"+"ipt>";
+    const printScript = ST+'window.addEventListener("load",function(){setTimeout(function(){window.print();},800);});'+SET;
+    const html = htmlBase.replace("</body>", printScript+"\n</body>");
+    const blob = new Blob([html], {type:"text/html;charset=utf-8"});
+    const url  = URL.createObjectURL(blob);
+    const num = (rel.numRelatorio||"RTK").replace(/[^a-zA-Z0-9-]/g,"_");
+    const cli = (rel.cliente||"cliente").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9 ]/g,"").trim().replace(/ +/g,"_");
+    const dt  = rel.dataRelatorio?rel.dataRelatorio.split("-").reverse().join("-"):"sem-data";
     const a = document.createElement("a");
     a.href = url;
-    a.download = (function(){
-    var num = (rel.numRelatorio||"RTK").replace(/[^a-zA-Z0-9-]/g,"_");
-    var cli = (rel.cliente||"cliente").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9 ]/g,"").trim().replace(/ +/g,"_");
-    var dt  = rel.dataRelatorio?rel.dataRelatorio.split("-").reverse().join("-"):"sem-data";
-    return num+"_"+cli+"_"+dt+".html";
-  })();
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    a.download = num+"_"+cli+"_"+dt+".html";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 15000);
+  } catch(e) {
+    alert("Erro ao gerar PDF: "+e.message);
   }
-  setTimeout(()=>URL.revokeObjectURL(url), 15000);
 }
-
 
 // ─── EXPORT JPG ───────────────────────────────────────────────────────────────
 function exportJPG(rel, todosRelatorios) {
-  const htmlBase = buildReportHTML(rel, todosRelatorios);
-  const nomeArq = (function(){
-    var num = (rel.numRelatorio||"RTK").replace(/[^a-zA-Z0-9-]/g,"_");
-    var cli = (rel.cliente||"cliente").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-zA-Z0-9 ]/g,"").trim().replace(/ +/g,"_");
-    var dt  = rel.dataRelatorio?rel.dataRelatorio.split("-").reverse().join("-"):"sem-data";
-    return num+"_"+cli+"_"+dt;
-  })();
+  try {
+    const htmlBase = buildReportHTML(rel, todosRelatorios);
+    const num = (rel.numRelatorio||"RTK").replace(/[^a-zA-Z0-9-]/g,"_");
+    const cli = (rel.cliente||"cliente").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9 ]/g,"").trim().replace(/ +/g,"_");
+    const dt  = rel.dataRelatorio?rel.dataRelatorio.split("-").reverse().join("-"):"sem-data";
+    const nomeArq = num+"_"+cli+"_"+dt;
 
-  const S  = "<"+"scr"+"ipt";
-  const ES = "<"+"/scr"+"ipt>";
+    const S  = "<"+"scr"+"ipt";
+    const ES = "<"+"/scr"+"ipt>";
+    const jpgScript = [
+      '<style>',
+      '.page-footer{position:absolute!important;bottom:0!important;left:0!important;right:0!important;width:100%!important;}',
+      '.page{position:relative!important;padding-bottom:80px!important;width:794px!important;margin:0 auto!important;box-sizing:border-box!important;}',
+      'body{background:#fff!important;margin:0!important;padding:20px 0!important;}',
+      '#kb-status{position:fixed;top:0;left:0;right:0;background:#1C2633;color:#fff;padding:12px 20px;font-family:Arial;font-size:14px;z-index:9999;text-align:center;}',
+      '</style>',
+      '<div id="kb-status">Preparando exportação JPG...</div>',
+      S+' src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">'+ES,
+      S+'>',
+      'var NOME="'+nomeArq+'";',
+      'window.addEventListener("load",function(){setTimeout(function(){',
+      '  var pages=Array.from(document.querySelectorAll(".page"));',
+      '  if(!pages.length){document.getElementById("kb-status").textContent="Nenhuma página encontrada.";return;}',
+      '  var idx=0;',
+      '  function next(){',
+      '    if(idx>=pages.length){document.getElementById("kb-status").textContent="Concluído! "+pages.length+" imagem(ns) salva(s)!";document.getElementById("kb-status").style.background="#16a34a";return;}',
+      '    document.getElementById("kb-status").textContent="Exportando página "+(idx+1)+" de "+pages.length+"...";',
+      '    html2canvas(pages[idx],{scale:2,useCORS:true,allowTaint:true,backgroundColor:"#ffffff",logging:false,width:794,windowWidth:834,scrollX:0,scrollY:-window.scrollY})',
+      '    .then(function(c){var a=document.createElement("a");a.href=c.toDataURL("image/jpeg",0.95);a.download=NOME+"_pag"+String(idx+1).padStart(2,"0")+".jpg";document.body.appendChild(a);a.click();document.body.removeChild(a);idx++;setTimeout(next,1200);})',
+      '    .catch(function(){idx++;setTimeout(next,500);});',
+      '  }',
+      '  setTimeout(next,800);',
+      '},2000);});',
+      ES,
+      '</body>'
+    ].join("\n");
 
-  // Script que converte position:fixed para absolute antes de capturar
-  const jpgScript = [
-    '<style id="jpg-fix">',
-    '.page-footer { position: absolute !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; }',
-    '.page { position: relative !important; padding-bottom: 80px !important; box-sizing: border-box !important; width: 794px !important; margin: 0 auto !important; }',
-    'body { background: #fff !important; margin: 0 !important; padding: 20px 0 !important; }',
-    '</style>',
-    '<div id="kb-status" style="position:fixed;top:0;left:0;right:0;background:#1C2633;color:#fff;padding:12px 20px;font-family:Arial;font-size:14px;z-index:9999;text-align:center;">',
-    '<span id="kb-msg">Preparando exportação JPG...</span></div>',
-    S+' src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">'+ES,
-    S+'>',
-    'var NOME="'+nomeArq+'";',
-    'function setMsg(t,ok){var e=document.getElementById("kb-msg");if(e)e.textContent=t;var s=document.getElementById("kb-status");if(s&&ok)s.style.background="#16a34a";}',
-    'window.addEventListener("load",function(){',
-    '  setTimeout(function(){',
-    '    var pages=Array.from(document.querySelectorAll(".page"));',
-    '    if(!pages.length){setMsg("Nenhuma página encontrada.");return;}',
-    '    var idx=0;',
-    '    function next(){',
-    '      if(idx>=pages.length){setMsg("Concluído! "+pages.length+" imagem(ns) salva(s)!",true);return;}',
-    '      setMsg("Exportando página "+(idx+1)+" de "+pages.length+"...");',
-    '      var pg=pages[idx];',
-    '      var w=794;',
-    '      html2canvas(pg,{',
-    '        scale:2,',
-    '        useCORS:true,',
-    '        allowTaint:true,',
-    '        backgroundColor:"#ffffff",',
-    '        logging:false,',
-    '        width:w,',
-    '        windowWidth:w+40,',
-    '        x:0,',
-    '        scrollX:0,',
-    '        scrollY:-window.scrollY',
-    '      }).then(function(c){',
-    '        var a=document.createElement("a");',
-    '        a.href=c.toDataURL("image/jpeg",0.95);',
-    '        a.download=NOME+"_pag"+String(idx+1).padStart(2,"0")+".jpg";',
-    '        document.body.appendChild(a);a.click();document.body.removeChild(a);',
-    '        idx++;setTimeout(next,1200);',
-    '      }).catch(function(){idx++;setTimeout(next,500);});',
-    '    }',
-    '    setTimeout(next,800);',
-    '  },2000);',
-    '});',
-    ES,
-    '</body>'
-  ].join("\n");
-
-  const htmlComCaptura = htmlBase.replace("</body>", jpgScript);
-  const blob = new Blob([htmlComCaptura],{type:"text/html;charset=utf-8"});
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
-  a.href     = url;
-  a.download = nomeArq+"_EXPORTAR_JPG.html";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url),5000);
-  alert("Arquivo HTML baixado!\n\nAbra no Chrome para exportar as imagens JPG automaticamente.");
+    const htmlComCaptura = htmlBase.replace("</body>", jpgScript);
+    const blob = new Blob([htmlComCaptura],{type:"text/html;charset=utf-8"});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = nomeArq+"_EXPORTAR_JPG.html";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
+  } catch(e) {
+    alert("Erro ao gerar JPG: "+e.message);
+  }
 }
 
 // ─── PIZZA CHART ──────────────────────────────────────────────────────────────
