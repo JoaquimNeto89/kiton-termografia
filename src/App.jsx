@@ -244,7 +244,7 @@ function buildReportHTML(rel, todosRelatorios) {
   </div>`; }
 
   function footer() { return `
-  <div style="background:#1C2633;padding:12px 36px;margin-top:auto;">
+  <div style="background:#1C2633;padding:12px 36px;margin-top:24px;">
     <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA</div>
     <div style="font-size:10px;color:#94a3b8;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
   </div>`; }
@@ -299,7 +299,6 @@ function buildReportHTML(rel, todosRelatorios) {
   </div>
   ${buildPizzaSVG(criticos,alertas,normais,pontos.length)}
   <div style="flex:1;min-height:20px;"></div>
-  <div style="flex:1;min-height:16px;"></div>
   ${footer()}
 </div>`;
 
@@ -333,7 +332,6 @@ function buildReportHTML(rel, todosRelatorios) {
     </table>
   </div>
   <div style="flex:1;min-height:20px;"></div>
-  <div style="flex:1;min-height:16px;"></div>
   ${footer()}
 </div>`;
 
@@ -399,7 +397,6 @@ function buildReportHTML(rel, todosRelatorios) {
     </table>
   </div>`:""}
   ${p.observacoes?`${sec("Observações")}<div style="padding:0 36px;"><div style="border:1px solid #e5e7eb;border-radius:6px;padding:10px 14px;font-size:12px;color:#374151;">${p.observacoes}</div></div>`:""}
-  <div style="flex:1;min-height:16px;"></div>
   ${footer()}
 </div>`;
   }).join("\n");
@@ -470,7 +467,6 @@ function buildReportHTML(rel, todosRelatorios) {
     </div>
   </div>
   <div style="flex:1;min-height:20px;"></div>
-  <div style="flex:1;min-height:16px;"></div>
   ${footer()}
 </div>`;
 
@@ -484,9 +480,9 @@ function buildReportHTML(rel, todosRelatorios) {
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:"Open Sans",Arial,sans-serif;background:#e5e7eb;color:#111;}
-  .page{background:#fff;max-width:210mm;margin:24px auto;display:flex;flex-direction:column;min-height:297mm;box-shadow:0 4px 24px rgba(0,0,0,.15);page-break-after:always;overflow:hidden;}
+  .page{background:#fff;max-width:210mm;margin:24px auto;display:flex;flex-direction:column;box-shadow:0 4px 24px rgba(0,0,0,.15);page-break-after:always;overflow:hidden;}
   table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;}
-  @media print{body{background:#fff!important;}.page{margin:0!important;box-shadow:none!important;page-break-after:always;min-height:unset!important;width:100%!important;max-width:100%!important;}@page{size:A4;margin:0;}}
+  @media print{html,body{background:#fff!important;margin:0;padding:0;}.page{margin:0!important;box-shadow:none!important;page-break-after:always;break-after:page;min-height:unset!important;height:auto!important;width:100%!important;max-width:100%!important;}@page{size:A4 portrait;margin:0;}}
   @media(max-width:600px){.page{margin:8px;}}
 </style>
 </head>
