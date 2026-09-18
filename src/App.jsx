@@ -553,7 +553,7 @@ ${footerPag()}
   @media print{
     html,body{background:#fff!important;margin:0;padding:0;}
     .page{margin:0!important;box-shadow:none!important;page-break-after:always;break-after:page;width:100%!important;max-width:100%!important;padding-bottom:80px!important;}
-    .page-footer{position:fixed;bottom:0;left:0;right:0;width:100%;}
+    .page-footer{position:absolute!important;bottom:0;left:0;right:0;width:100%;}
     @page{size:A4 portrait;margin:0;}
   }
   @media(max-width:600px){.page{margin:8px;}}
@@ -606,7 +606,7 @@ function exportJPG(rel, todosRelatorios) {
     const jpgScript = [
       '<style>',
       '.page-footer{position:absolute!important;bottom:0!important;left:0!important;right:0!important;width:100%!important;}',
-      '.page{position:relative!important;padding-bottom:80px!important;width:794px!important;margin:0 auto!important;box-sizing:border-box!important;}',
+      '.page{position:relative!important;width:794px!important;min-height:1123px!important;margin:0 auto!important;box-sizing:border-box!important;padding-bottom:80px!important;display:flex!important;flex-direction:column!important;}',
       'body{background:#fff!important;margin:0!important;padding:20px 0!important;}',
       '#kb-status{position:fixed;top:0;left:0;right:0;background:#1C2633;color:#fff;padding:12px 20px;font-family:Arial;font-size:14px;z-index:9999;text-align:center;}',
       '</style>',
@@ -621,7 +621,7 @@ function exportJPG(rel, todosRelatorios) {
       '  function next(){',
       '    if(idx>=pages.length){document.getElementById("kb-status").textContent="Concluído! "+pages.length+" imagem(ns) salva(s)!";document.getElementById("kb-status").style.background="#16a34a";return;}',
       '    document.getElementById("kb-status").textContent="Exportando página "+(idx+1)+" de "+pages.length+"...";',
-      '    html2canvas(pages[idx],{scale:2,useCORS:true,allowTaint:true,backgroundColor:"#ffffff",logging:false,width:794,windowWidth:834,scrollX:0,scrollY:-window.scrollY})',
+      '    html2canvas(pages[idx],{scale:2,useCORS:true,allowTaint:true,backgroundColor:"#ffffff",logging:false,width:794,height:1123,windowWidth:834,scrollX:0,scrollY:-window.scrollY})',
       '    .then(function(c){var a=document.createElement("a");a.href=c.toDataURL("image/jpeg",0.95);a.download=NOME+"_pag"+String(idx+1).padStart(2,"0")+".jpg";document.body.appendChild(a);a.click();document.body.removeChild(a);idx++;setTimeout(next,1200);})',
       '    .catch(function(){idx++;setTimeout(next,500);});',
       '  }',
