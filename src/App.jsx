@@ -196,7 +196,7 @@ export default function App() {
 function buildPizzaSVG(criticos,alertas,normais,total) {
   if(!total||total===0) return "";
   const data=[{l:"Crítico",v:criticos,c:"#CD0000"},{l:"Alerta",v:alertas,c:"#f59e0b"},{l:"Normal",v:normais,c:"#16a34a"}].filter(d=>d.v>0);
-  const cx=100,cy=100,r=85;
+  const cx=100,cy=100,r=82;
   let svgPaths="";
   if(data.length===1) {
     // Círculo sólido para caso de 100%
@@ -212,7 +212,7 @@ function buildPizzaSVG(criticos,alertas,normais,total) {
       return '<path d="M'+cx+','+cy+' L'+x1+','+y1+' A'+r+','+r+' 0 '+large+',1 '+x2+','+y2+' Z" fill="'+d.c+'" stroke="#fff" stroke-width="2"/>';
     }).join("");
   }
-  const svg='<svg viewBox="0 0 200 200" style="width:180px;height:180px;flex-shrink:0;">'+svgPaths+'<circle cx="'+cx+'" cy="'+cy+'" r="24" fill="#f8fafc"/><text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#111" font-size="14" font-weight="800" font-family="Arial">'+total+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#6b7280" font-size="8" font-family="Arial">TOTAL</text></svg>';
+  const svg='<svg viewBox="0 0 200 200" style="width:180px;height:180px;flex-shrink:0;">'+svgPaths+'<circle cx="'+cx+'" cy="'+cy+'" r="24" fill="#f8fafc"/><text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#111" font-size="18" font-weight="800" font-family="Arial">'+total+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#6b7280" font-size="8" font-family="Arial">TOTAL</text></svg>';
   const rows=[{l:"Crítico",v:criticos,c:"#CD0000"},{l:"Alerta",v:alertas,c:"#f59e0b"},{l:"Normal",v:normais,c:"#16a34a"}]
     .map(function(s){return '<div style="display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid #f0f0f0;"><div style="width:16px;height:16px;border-radius:50%;background:'+s.c+';flex-shrink:0;"></div><div style="flex:1;font-size:15px;color:#374151;font-weight:600;">'+s.l+'</div><div style="font-size:22px;font-weight:800;color:'+s.c+';">'+s.v+'</div><div style="font-size:14px;color:#9ca3af;width:44px;text-align:right;">'+Math.round(s.v/total*100)+'%</div></div>';}).join("");
   return '<div style="margin:16px 36px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:20px 28px;display:flex;align-items:center;gap:32px;flex-wrap:wrap;"><div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:-4px;">Distribuição por Severidade</div>'+svg+'<div style="display:flex;flex-direction:column;gap:4px;flex:1;">'+rows+'</div></div>';
@@ -302,11 +302,19 @@ function buildReportHTML(rel, todosRelatorios) {
   ${footer()}
 </div>`;
 
-  // ── ÍNDICE ────────────────────────────────────────────────────────────────
-  const pageIndice = `
+  // ── ÍNDICE (com quebra de página automática) ────────────────────────────
+  // Dividir pontos em grupos de 20 por página
+  const PONTOS_POR_PAGINA_INDICE = 20;
+  const gruposIndice = [];
+  for(let gi=0; gi<pontos.length; gi+=PONTOS_POR_PAGINA_INDICE) {
+    gruposIndice.push(pontos.slice(gi, gi+PONTOS_POR_PAGINA_INDICE));
+  }
+  if(gruposIndice.length===0) gruposIndice.push([]);
+
+  const pageIndice = gruposIndice.map((grupo, gi) => `
 <div class="page">
   ${header()}
-  ${sec("Índice de Medições")}
+  ${sec("Índice de Medições"+(gi>0?" (continuação "+( gi+1)+"º parte)":""))}
   <div style="padding:0 36px;">
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="background:#1C2633;">
@@ -318,22 +326,25 @@ function buildReportHTML(rel, todosRelatorios) {
         <th style="padding:8px 10px;color:#fff;text-align:center;font-size:11px;">ΔT</th>
         <th style="padding:8px 10px;color:#fff;text-align:center;font-size:11px;">Severidade</th>
       </tr></thead>
-      <tbody>${pontos.map((p,i)=>`
-        <tr style="background:${i%2===0?"#fff":"#f9fafb"};">
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;">${i+1}</td>
+      <tbody>${grupo.map((p,li)=>{
+        const pi = gi*PONTOS_POR_PAGINA_INDICE + li;
+        return `
+        <tr style="background:${li%2===0?"#fff":"#f9fafb"};">
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;">${pi+1}</td>
           <td style="padding:7px 10px;border:1px solid #e5e7eb;font-weight:600;color:#b45309;">${p.tag||"—"}</td>
           <td style="padding:7px 10px;border:1px solid #e5e7eb;font-weight:600;">${p.equipamento||"—"}</td>
           <td style="padding:7px 10px;border:1px solid #e5e7eb;">${p.tipoEquip||"—"}</td>
           <td style="padding:7px 10px;border:1px solid #e5e7eb;">${p.localizacao||"—"}</td>
           <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:${sc[p.severidade]||"#16a34a"};">${p.deltaT||"—"}°C</td>
           <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;"><span style="background:${sb[p.severidade]||"#f0fdf4"};color:${sc[p.severidade]||"#16a34a"};padding:2px 8px;border-radius:10px;font-weight:700;font-size:10px;">${sl[p.severidade]||"🟢 NORMAL"}</span></td>
-        </tr>`).join("")}
+        </tr>`;
+      }).join("")}
       </tbody>
     </table>
   </div>
-  <div style="flex:1;min-height:20px;"></div>
   ${footer()}
-</div>`;
+</div>`).join("\n");
+
 
   // ── PÁGINAS DE MEDIÇÃO ────────────────────────────────────────────────────
   const pagesMedicao = pontos.map((p,i)=>{
@@ -391,8 +402,8 @@ function buildReportHTML(rel, todosRelatorios) {
     </div>
   </div>
   <div class="page-footer" style="background:#1C2633;padding:12px 36px;">
-    <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#94a3b8;"> — Inúmeras soluções, uma única empresa</span></div>
-    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
+    <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#e2e8f0;font-family:'Rajdhani',sans-serif;"> — Inúmeras soluções, uma única empresa</span></div>
+    <div style="font-size:10px;color:#e2e8f0;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
   </div>
 </div>`;
 
@@ -433,8 +444,8 @@ function buildReportHTML(rel, todosRelatorios) {
     </table>
   </div>`:""}
   <div class="page-footer" style="background:#1C2633;padding:12px 36px;">
-    <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#94a3b8;"> — Inúmeras soluções, uma única empresa</span></div>
-    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
+    <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#e2e8f0;font-family:'Rajdhani',sans-serif;"> — Inúmeras soluções, uma única empresa</span></div>
+    <div style="font-size:10px;color:#e2e8f0;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
   </div>
 </div>`;
 
@@ -580,38 +591,66 @@ function exportPDF(rel, todosRelatorios) {
 // ─── EXPORT JPG ───────────────────────────────────────────────────────────────
 function exportJPG(rel, todosRelatorios) {
   const htmlBase = buildReportHTML(rel, todosRelatorios);
-  const nomeArq = (rel.numRelatorio||"RTK").replace(/[^a-zA-Z0-9-]/g,"_")+"_"+(rel.cliente||"cliente").replace(/[^a-zA-Z0-9 ]/g,"").trim().replace(/ +/g,"_")+"_"+(rel.dataRelatorio?rel.dataRelatorio.split("-").reverse().join("-"):"sem-data");
+  const nomeArq = (function(){
+    var num = (rel.numRelatorio||"RTK").replace(/[^a-zA-Z0-9-]/g,"_");
+    var cli = (rel.cliente||"cliente").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-zA-Z0-9 ]/g,"").trim().replace(/ +/g,"_");
+    var dt  = rel.dataRelatorio?rel.dataRelatorio.split("-").reverse().join("-"):"sem-data";
+    return num+"_"+cli+"_"+dt;
+  })();
 
   const S  = "<"+"scr"+"ipt";
   const ES = "<"+"/scr"+"ipt>";
+
+  // Script que converte position:fixed para absolute antes de capturar
   const jpgScript = [
+    '<style id="jpg-fix">',
+    '.page-footer { position: absolute !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; }',
+    '.page { position: relative !important; padding-bottom: 80px !important; box-sizing: border-box !important; width: 794px !important; margin: 0 auto !important; }',
+    'body { background: #fff !important; margin: 0 !important; padding: 20px 0 !important; }',
+    '</style>',
     '<div id="kb-status" style="position:fixed;top:0;left:0;right:0;background:#1C2633;color:#fff;padding:12px 20px;font-family:Arial;font-size:14px;z-index:9999;text-align:center;">',
-    '<span id="kb-msg">Preparando exportacao...</span></div>',
+    '<span id="kb-msg">Preparando exportação JPG...</span></div>',
     S+' src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">'+ES,
     S+'>',
     'var NOME="'+nomeArq+'";',
     'function setMsg(t,ok){var e=document.getElementById("kb-msg");if(e)e.textContent=t;var s=document.getElementById("kb-status");if(s&&ok)s.style.background="#16a34a";}',
-    'window.addEventListener("load",function(){setTimeout(function(){',
-    'var pages=Array.from(document.querySelectorAll(".page"));',
-    'if(!pages.length){setMsg("Nenhuma pagina encontrada.");return;}',
-    'var idx=0;',
-    'function next(){',
-    'if(idx>=pages.length){setMsg("Concluido! "+pages.length+" imagem(ns) salva(s)!",true);return;}',
-    'setMsg("Exportando pagina "+(idx+1)+" de "+pages.length+"...");',
-    'html2canvas(pages[idx],{scale:2,useCORS:true,allowTaint:true,backgroundColor:"#ffffff",logging:false}).then(function(c){',
-    'var a=document.createElement("a");',
-    'a.href=c.toDataURL("image/jpeg",0.95);',
-    'a.download=NOME+"_pag"+String(idx+1).padStart(2,"0")+".jpg";',
-    'document.body.appendChild(a);a.click();document.body.removeChild(a);',
-    'idx++;setTimeout(next,1200);',
-    '}).catch(function(){idx++;setTimeout(next,500);});}',
-    'setTimeout(next,500);},2000);});',
+    'window.addEventListener("load",function(){',
+    '  setTimeout(function(){',
+    '    var pages=Array.from(document.querySelectorAll(".page"));',
+    '    if(!pages.length){setMsg("Nenhuma página encontrada.");return;}',
+    '    var idx=0;',
+    '    function next(){',
+    '      if(idx>=pages.length){setMsg("Concluído! "+pages.length+" imagem(ns) salva(s)!",true);return;}',
+    '      setMsg("Exportando página "+(idx+1)+" de "+pages.length+"...");',
+    '      var pg=pages[idx];',
+    '      var w=794;',
+    '      html2canvas(pg,{',
+    '        scale:2,',
+    '        useCORS:true,',
+    '        allowTaint:true,',
+    '        backgroundColor:"#ffffff",',
+    '        logging:false,',
+    '        width:w,',
+    '        windowWidth:w+40,',
+    '        x:0,',
+    '        scrollX:0,',
+    '        scrollY:-window.scrollY',
+    '      }).then(function(c){',
+    '        var a=document.createElement("a");',
+    '        a.href=c.toDataURL("image/jpeg",0.95);',
+    '        a.download=NOME+"_pag"+String(idx+1).padStart(2,"0")+".jpg";',
+    '        document.body.appendChild(a);a.click();document.body.removeChild(a);',
+    '        idx++;setTimeout(next,1200);',
+    '      }).catch(function(){idx++;setTimeout(next,500);});',
+    '    }',
+    '    setTimeout(next,800);',
+    '  },2000);',
+    '});',
     ES,
     '</body>'
   ].join("\n");
-  const htmlComCaptura = htmlBase.replace("</body>", jpgScript);
 
-  // Criar blob e baixar — ao abrir no browser executa o script
+  const htmlComCaptura = htmlBase.replace("</body>", jpgScript);
   const blob = new Blob([htmlComCaptura],{type:"text/html;charset=utf-8"});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
@@ -621,7 +660,7 @@ function exportJPG(rel, todosRelatorios) {
   a.click();
   document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url),5000);
-  alert("Arquivo HTML baixado!\n\nAbra o arquivo no Chrome para exportar automaticamente as imagens JPG.");
+  alert("Arquivo HTML baixado!\n\nAbra no Chrome para exportar as imagens JPG automaticamente.");
 }
 
 // ─── PIZZA CHART ──────────────────────────────────────────────────────────────
