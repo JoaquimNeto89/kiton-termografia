@@ -938,10 +938,10 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
                     <tr key={c.nome} onClick={()=>setFiltro(filtro===c.nome?"todos":c.nome)}
                       style={{borderTop:"1px solid #1f2937",cursor:"pointer",background:filtro===c.nome?"rgba(205,0,0,0.08)":"transparent"}}>
                       <td style={{padding:"9px 12px",fontWeight:600,color:filtro===c.nome?"#CD0000":"#f1f5f9",fontSize:13}}>{c.nome}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:"#60a5fa",fontSize:13}}>{c.total}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.crit>0?"#ef4444":"#374151",fontSize:13}}>{c.crit}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.alert>0?"#f59e0b":"#374151",fontSize:13}}>{c.alert}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.norm>0?"#22c55e":"#374151",fontSize:13}}>{c.norm}</td>
+                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.total>0?"#60a5fa":"#94a3b8",fontSize:13}}>{c.total}</td>
+                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.crit>0?"#ef4444":"#94a3b8",fontSize:13}}>{c.crit}</td>
+                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.alert>0?"#f59e0b":"#94a3b8",fontSize:13}}>{c.alert}</td>
+                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.norm>0?"#22c55e":"#94a3b8",fontSize:13}}>{c.norm}</td>
                     </tr>
                   ))}
                 </tbody>
