@@ -1062,7 +1062,7 @@ function CardRel({ r, onEdit, onDelete, onPdf, onJpg }) {
           <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,color:"#f1f5f9"}}>{r.cliente}</span>
           {r.numRelatorio && <Tag color="#CD0000">{r.numRelatorio}</Tag>}
           {r.os && <Tag>OS: {r.os}</Tag>}
-          {r.status && r.status!=="Final" && <Tag color={r.status==="Rascunho"?"#3b82f6":"#f59e0b"}>{r.status==="Rascunho"?"📝 Rascunho":"📋 Preliminar"}</Tag>}
+          {r.status && <Tag color={r.status==="Rascunho"?"#3b82f6":r.status==="Preliminar"?"#f59e0b":"#22c55e"}>{r.status==="Rascunho"?"📝 Rascunho":r.status==="Preliminar"?"📋 Preliminar":"✅ Final"}</Tag>}
           <span style={{fontSize:12,color:"#94a3b8"}}>📅 {fmtDate(r.dataRelatorio)}</span>
         </div>
         <div style={{fontSize:12,color:"#94a3b8",marginBottom:10}}>{[r.local,r.tecnico].filter(Boolean).join(" · ")||"Sem detalhes"}</div>
