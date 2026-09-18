@@ -197,20 +197,27 @@ function buildPizzaSVG(criticos,alertas,normais,total) {
   if(!total||total===0) return "";
   const data=[{l:"Crítico",v:criticos,c:"#CD0000"},{l:"Alerta",v:alertas,c:"#f59e0b"},{l:"Normal",v:normais,c:"#16a34a"}].filter(d=>d.v>0);
   const cx=70,cy=70,r=60;
-  let cum=-Math.PI/2;
-  const paths=data.map(d=>{
-    const angle=(d.v/total)*2*Math.PI;
-    const x1=cx+r*Math.cos(cum),y1=cy+r*Math.sin(cum);
-    cum+=angle;
-    const x2=cx+r*Math.cos(cum),y2=cy+r*Math.sin(cum);
-    const large=angle>Math.PI?1:0;
-    return '<path d="M'+cx+','+cy+' L'+x1+','+y1+' A'+r+','+r+' 0 '+large+',1 '+x2+','+y2+' Z" fill="'+d.c+'" stroke="#fff" stroke-width="2"/>';
-  }).join("");
-  const svg='<svg viewBox="0 0 140 140" style="width:130px;height:130px;flex-shrink:0;">'+paths+'<circle cx="'+cx+'" cy="'+cy+'" r="24" fill="#f8fafc"/><text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#111" font-size="14" font-weight="800" font-family="Arial">'+total+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#6b7280" font-size="8" font-family="Arial">TOTAL</text></svg>';
+  let svgPaths="";
+  if(data.length===1) {
+    // Círculo sólido para caso de 100%
+    svgPaths='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+data[0].c+'"/>';
+  } else {
+    let cum=-Math.PI/2;
+    svgPaths=data.map(function(d){
+      const angle=(d.v/total)*2*Math.PI;
+      const x1=cx+r*Math.cos(cum),y1=cy+r*Math.sin(cum);
+      cum+=angle;
+      const x2=cx+r*Math.cos(cum),y2=cy+r*Math.sin(cum);
+      const large=angle>Math.PI?1:0;
+      return '<path d="M'+cx+','+cy+' L'+x1+','+y1+' A'+r+','+r+' 0 '+large+',1 '+x2+','+y2+' Z" fill="'+d.c+'" stroke="#fff" stroke-width="2"/>';
+    }).join("");
+  }
+  const svg='<svg viewBox="0 0 140 140" style="width:130px;height:130px;flex-shrink:0;">'+svgPaths+'<circle cx="'+cx+'" cy="'+cy+'" r="24" fill="#f8fafc"/><text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#111" font-size="14" font-weight="800" font-family="Arial">'+total+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#6b7280" font-size="8" font-family="Arial">TOTAL</text></svg>';
   const rows=[{l:"Crítico",v:criticos,c:"#CD0000"},{l:"Alerta",v:alertas,c:"#f59e0b"},{l:"Normal",v:normais,c:"#16a34a"}]
-    .map(s=>'<div style="display:flex;align-items:center;gap:10px;"><div style="width:12px;height:12px;border-radius:50%;background:'+s.c+';flex-shrink:0;"></div><div style="flex:1;font-size:13px;color:#6b7280;">'+s.l+'</div><div style="font-size:18px;font-weight:800;color:'+s.c+';">'+s.v+'</div><div style="font-size:12px;color:#9ca3af;width:36px;text-align:right;">'+Math.round(s.v/total*100)+'%</div></div>').join("");
+    .map(function(s){return '<div style="display:flex;align-items:center;gap:10px;"><div style="width:12px;height:12px;border-radius:50%;background:'+s.c+';flex-shrink:0;"></div><div style="flex:1;font-size:13px;color:#6b7280;">'+s.l+'</div><div style="font-size:18px;font-weight:800;color:'+s.c+';">'+s.v+'</div><div style="font-size:12px;color:#9ca3af;width:36px;text-align:right;">'+Math.round(s.v/total*100)+'%</div></div>';}).join("");
   return '<div style="margin:16px 36px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;"><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:-4px;">Distribuição por Severidade</div>'+svg+'<div style="display:flex;flex-direction:column;gap:8px;flex:1;">'+rows+'</div></div>';
 }
+
 
 function buildReportHTML(rel, todosRelatorios) {
   const rels3 = [...(todosRelatorios||[])].filter(r=>r.cliente===rel.cliente).sort((a,b)=>new Date(b.dataRelatorio)-new Date(a.dataRelatorio)).slice(0,3);
@@ -291,6 +298,8 @@ function buildReportHTML(rel, todosRelatorios) {
     </tr></tbody></table>
   </div>
   ${buildPizzaSVG(criticos,alertas,normais,pontos.length)}
+  <div style="flex:1;min-height:20px;"></div>
+  <div style="flex:1;min-height:16px;"></div>
   ${footer()}
 </div>`;
 
@@ -323,6 +332,8 @@ function buildReportHTML(rel, todosRelatorios) {
       </tbody>
     </table>
   </div>
+  <div style="flex:1;min-height:20px;"></div>
+  <div style="flex:1;min-height:16px;"></div>
   ${footer()}
 </div>`;
 
@@ -388,6 +399,7 @@ function buildReportHTML(rel, todosRelatorios) {
     </table>
   </div>`:""}
   ${p.observacoes?`${sec("Observações")}<div style="padding:0 36px;"><div style="border:1px solid #e5e7eb;border-radius:6px;padding:10px 14px;font-size:12px;color:#374151;">${p.observacoes}</div></div>`:""}
+  <div style="flex:1;min-height:16px;"></div>
   ${footer()}
 </div>`;
   }).join("\n");
@@ -457,6 +469,8 @@ function buildReportHTML(rel, todosRelatorios) {
       </div>
     </div>
   </div>
+  <div style="flex:1;min-height:20px;"></div>
+  <div style="flex:1;min-height:16px;"></div>
   ${footer()}
 </div>`;
 
@@ -500,7 +514,12 @@ function exportPDF(rel, todosRelatorios) {
     // fallback: baixar o arquivo
     const a = document.createElement("a");
     a.href = url;
-    a.download = (rel.numRelatorio||"RTK").replace(/[^a-zA-Z0-9-]/g,"_")+"_"+(rel.cliente||"cliente").replace(/[^a-zA-Z0-9 ]/g,"").trim().replace(/ +/g,"_")+"_"+(rel.dataRelatorio?rel.dataRelatorio.split("-").reverse().join("-"):"sem-data")+".html";
+    a.download = (function(){
+    var num = (rel.numRelatorio||"RTK").replace(/[^a-zA-Z0-9-]/g,"_");
+    var cli = (rel.cliente||"cliente").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9 ]/g,"").trim().replace(/ +/g,"_");
+    var dt  = rel.dataRelatorio?rel.dataRelatorio.split("-").reverse().join("-"):"sem-data";
+    return num+"_"+cli+"_"+dt+".html";
+  })();
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }
   setTimeout(()=>URL.revokeObjectURL(url), 15000);
