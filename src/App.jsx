@@ -924,13 +924,13 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
           <div style={{background:"#0f1422",border:"1px solid #1f2937",borderRadius:10,overflow:"hidden",marginBottom:16}}>
             <div style={{padding:"10px 16px",borderBottom:"1px solid #1f2937",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:700,color:"#6b7280",textTransform:"uppercase",letterSpacing:.8}}>📊 Resumo por Cliente</span>
-              <span style={{fontSize:11,color:"#374151"}}>{clis.length} cliente(s)</span>
+              <span style={{fontSize:11,color:"#94a3b8"}}>{clis.length} cliente(s)</span>
             </div>
             <div style={{overflowY:"auto",maxHeight:205,scrollbarWidth:"thin",scrollbarColor:"#334155 #0f1422"}}>
               <table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr style={{background:"#080b13",position:"sticky",top:0,zIndex:1}}>
-                  {["Cliente","Relat.","🔴","🟡","🟢"].map(h=>(
-                    <th key={h} style={{padding:"8px 12px",textAlign:h==="Cliente"?"left":"center",fontSize:11,fontWeight:700,color:"#4b5563",textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}}>{h}</th>
+                  {["Cliente","Qtd. de Relatórios","🔴","🟡","🟢"].map(h=>(
+                    <th key={h} style={{padding:"8px 12px",textAlign:h==="Cliente"?"left":"center",fontSize:11,fontWeight:700,color:"#f1f5f9",textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}}>{h}</th>
                   ))}
                 </tr></thead>
                 <tbody>
@@ -959,7 +959,7 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
           <div key={s.l} style={{background:"#0f1422",border:"1px solid #1f2937",borderTop:"3px solid "+s.c,borderRadius:10,padding:"16px 20px"}}>
             <div style={{fontSize:22,marginBottom:4}}>{s.i}</div>
             <div style={{fontSize:28,fontWeight:800,color:s.c,fontFamily:"'Barlow Condensed',sans-serif",lineHeight:1}}>{s.v}</div>
-            <div style={{fontSize:11,color:"#4b5563",textTransform:"uppercase",letterSpacing:1,marginTop:4}}>{s.l}</div>
+            <div style={{fontSize:11,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1,marginTop:4}}>{s.l}</div>
           </div>
         ))}
       </div>
@@ -1024,9 +1024,9 @@ function CardRel({ r, onEdit, onDelete, onPdf, onJpg }) {
           {r.numRelatorio && <Tag color="#CD0000">{r.numRelatorio}</Tag>}
           {r.os && <Tag>OS: {r.os}</Tag>}
           {r.status && r.status!=="Final" && <Tag color={r.status==="Rascunho"?"#3b82f6":"#f59e0b"}>{r.status==="Rascunho"?"📝 Rascunho":"📋 Preliminar"}</Tag>}
-          <span style={{fontSize:12,color:"#4b5563"}}>📅 {fmtDate(r.dataRelatorio)}</span>
+          <span style={{fontSize:12,color:"#94a3b8"}}>📅 {fmtDate(r.dataRelatorio)}</span>
         </div>
-        <div style={{fontSize:12,color:"#4b5563",marginBottom:10}}>{[r.local,r.tecnico].filter(Boolean).join(" · ")||"Sem detalhes"}</div>
+        <div style={{fontSize:12,color:"#94a3b8",marginBottom:10}}>{[r.local,r.tecnico].filter(Boolean).join(" · ")||"Sem detalhes"}</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
           {["critico","alerta","normal"].map(s=>{
             const sv=SEV[s]; const c=pts.filter(p=>p.severidade===s).length;
