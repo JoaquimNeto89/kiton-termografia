@@ -953,6 +953,7 @@ function CardRel({ r, onEdit, onDelete, onPdf, onJpg }) {
           <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:700,color:"#f1f5f9"}}>{r.cliente}</span>
           {r.numRelatorio && <Tag color="#CD0000">{r.numRelatorio}</Tag>}
           {r.os && <Tag>OS: {r.os}</Tag>}
+          {r.status && r.status!=="Final" && <Tag color={r.status==="Rascunho"?"#3b82f6":"#f59e0b"}>{r.status==="Rascunho"?"📝 Rascunho":"📋 Preliminar"}</Tag>}
           <span style={{fontSize:12,color:"#4b5563"}}>📅 {fmtDate(r.dataRelatorio)}</span>
         </div>
         <div style={{fontSize:12,color:"#4b5563",marginBottom:10}}>{[r.local,r.tecnico].filter(Boolean).join(" · ")||"Sem detalhes"}</div>
@@ -982,7 +983,7 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
     id:Date.now(), numRelatorio:numAuto, os:"",
     cliente:"", responsavel:"", local:"",
     tecnico:"", instrumentos:[],
-    observacoes:"", pontos:[newPonto()],
+    status:"Rascunho", observacoes:"", pontos:[newPonto()],
     dataRelatorio: new Date().toISOString().slice(0,10),
   });
 
@@ -1041,6 +1042,20 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
               <F l="Nº OS (Ordem de Serviço)" v={form.os||""} s={v=>set("os",v)} ph="Ex: OS-2024-047"/>
               <F l="Data do Relatório *" t="date" v={form.dataRelatorio} s={v=>set("dataRelatorio",v)}/>
             </G3>
+            <div style={{marginTop:14}}>
+              <label>Status do Relatório</label>
+              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                {["Rascunho","Preliminar","Final"].map(s=>(
+                  <div key={s} onClick={()=>set("status",s)}
+                    style={{padding:"10px 24px",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:14,
+                      background:form.status===s?(s==="Rascunho"?"#1e3a5f":s==="Preliminar"?"#78350f":"#14532d"):"#111827",
+                      color:form.status===s?(s==="Rascunho"?"#60a5fa":s==="Preliminar"?"#fbbf24":"#4ade80"):"#4b5563",
+                      border:"2px solid "+(form.status===s?(s==="Rascunho"?"#3b82f6":s==="Preliminar"?"#f59e0b":"#22c55e"):"#1f2937")}}>
+                    {s==="Rascunho"?"📝 Rascunho":s==="Preliminar"?"📋 Preliminar":"✅ Final"}
+                  </div>
+                ))}
+              </div>
+            </div>
             <G3 mt={14}>
               <div>
                 <label>Cliente / Empresa *</label>
@@ -1123,8 +1138,13 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
 
       <div style={{display:"flex",justifyContent:"space-between",marginTop:20}}>
         <Btn onClick={step===0?onCancel:()=>setStep(s=>s-1)}>{step===0?"Cancelar":"← Anterior"}</Btn>
-        {step<1 ? <Btn onClick={()=>setStep(s=>s+1)} primary>Próximo →</Btn>
-                : <Btn onClick={()=>onSave(form)} success>✅ Salvar Relatório</Btn>}
+        {step<1
+          ? <Btn onClick={()=>setStep(s=>s+1)} primary>Próximo →</Btn>
+          : <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+              <Btn onClick={()=>setForm(f=>({...f,pontos:[...f.pontos,newPonto()]}))} style={{borderColor:"#3b82f6",color:"#60a5fa"}}>＋ Medição</Btn>
+              <Btn onClick={()=>onSave(form)} success>✅ Salvar Relatório</Btn>
+            </div>
+        }
       </div>
     </div>
   );
