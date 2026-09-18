@@ -363,10 +363,17 @@ function buildReportHTML(rel, todosRelatorios) {
     const scolor = sc[p.severidade]||"#16a34a";
     const sbg    = sb[p.severidade]||"#f0fdf4";
     const slabel = sl[p.severidade]||"🟢 NORMAL";
-    const hist   = rels3.map(r=>{
-      const pp = (r.pontos||[]).find(x=>x.equipamento===p.equipamento||x.tag===p.tag);
-      return pp ? {data:r.dataRelatorio,dt:pp.deltaT,sev:pp.severidade} : null;
-    }).filter(Boolean);
+    const hist = rels3
+      .filter(r => r.id !== rel.id)
+      .map(r => {
+        const pp = (r.pontos||[]).find(x => {
+          const matchTag = p.tag && x.tag && x.tag === p.tag;
+          const matchEqLoc = p.equipamento && x.equipamento === p.equipamento
+                          && p.localizacao && x.localizacao === p.localizacao;
+          return matchTag || matchEqLoc;
+        });
+        return pp ? {data:r.dataRelatorio,dt:pp.deltaT,sev:pp.severidade} : null;
+      }).filter(Boolean);
 
     // ── PÁGINA A: Identificação + Dados + Fotos ──────────────────────────────
     const pageA = `
@@ -804,11 +811,12 @@ function CadEquipamentos({ items, onChange }) {
             <F l="Identificação *" v={form.nome} s={v=>setF("nome",v)} ph="Ex: Quadro Geral"/>
             <FS l="Tipo" v={form.tipo} s={v=>setF("tipo",v)} opts={TIPOS}/>
             <FS l="Periodicidade" v={form.periodicidade} s={v=>setF("periodicidade",v)} opts={periodOpts}/>
-            <F l="Localização" v={form.localizacao} s={v=>setF("localizacao",v)} ph="Ex: Sala Elétrica"/>
-            <F l="Código de Área" v={form.codigoArea} s={v=>setF("codigoArea",v)} ph="Ex: P1"/>
+            <F l="Localização / Área *" v={form.localizacao} s={v=>setF("localizacao",v)} ph="Ex: Sala Elétrica"/>
+            <F l="Nome / Código de Área" v={form.codigoArea} s={v=>setF("codigoArea",v)} ph="Ex: P1, PINTURA"/>
           </div>
           <div style={{display:"flex",gap:8}}>
-            <Btn success small onClick={()=>{if(!form.nome){alert("Informe a identificação");return;}const exists=items.find(x=>x.id===form.id);onChange(exists?items.map(x=>x.id===form.id?form:x):[...items,form]);setForm(null);}}>✅ Salvar</Btn>
+            <Btn success small onClick={()=>{if(!form.nome){alert("Informe a identificação");return;}
+              if(!form.localizacao){alert("Localização / Área é obrigatória");return;}const exists=items.find(x=>x.id===form.id);onChange(exists?items.map(x=>x.id===form.id?form:x):[...items,form]);setForm(null);}}>✅ Salvar</Btn>
             <Btn small onClick={()=>setForm(null)}>Cancelar</Btn>
           </div>
         </div>
@@ -1314,8 +1322,8 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
         <FS l="Periodicidade" v={p.periodicidade||""} s={v=>onChange("periodicidade",v)} opts={periodOpts}/>
       </div>
       <G2 mb={12}>
-        <F l="Localização / Área" v={p.localizacao} s={v=>onChange("localizacao",v)} ph="Ex: Sala Elétrica Principal"/>
-        <F l="Código de Área" v={p.codigoArea||""} s={v=>onChange("codigoArea",v)} ph="Ex: P1, P2, PINTURA"/>
+        <F l="Localização / Área *" v={p.localizacao} s={v=>onChange("localizacao",v)} ph="Ex: Sala Elétrica Principal"/>
+        <F l="Nome / Código de Área" v={p.codigoArea||""} s={v=>onChange("codigoArea",v)} ph="Ex: P1, PINTURA"/>
       </G2>
 
       {/* Condições operacionais */}
