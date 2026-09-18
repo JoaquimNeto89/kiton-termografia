@@ -142,10 +142,10 @@ export default function App() {
           </div>
         </div>
         <nav style={{display:"flex",gap:4}}>
-          {[["dash","📊","Relatórios"],["form","📝","Novo"],["cadastros","🗂️","Cadastros"]].map(([v,icon,label])=>(
+          {[["dash","📊","Relatórios"],["form","📝","Novo Relatório"],["cadastros","🗂️","Cadastros"]].map(([v,icon,label])=>(
             <button key={v} onClick={()=>{ if(v==="form") setEditRel(null); setView(v); }}
-              style={{padding:"7px 12px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",
-                background:view===v?"#CD0000":"transparent",color:view===v?"#fff":"#6b7280",whiteSpace:"nowrap"}}>
+              style={{padding:"7px 14px",borderRadius:6,border:view===v?"1px solid #CD0000":"1px solid #374151",cursor:"pointer",fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",
+                background:view===v?"#CD0000":"transparent",color:view===v?"#fff":"#94a3b8",whiteSpace:"nowrap"}}>
               <span>{icon}</span>
               <span style={{marginLeft:4,display:"inline"}} className="hide-mobile">{label}</span>
             </button>
@@ -951,6 +951,11 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
           const rs = (data.relatorios||[]).filter(r=>r.cliente===cli.nome);
           const ps = rs.flatMap(r=>r.pontos||[]);
           return {nome:cli.nome, total:rs.length, crit:ps.filter(p=>p.severidade==="critico").length, alert:ps.filter(p=>p.severidade==="alerta").length, norm:ps.filter(p=>p.severidade==="normal").length};
+        }).sort((a,b)=>{
+          const aTemRel = a.total>0 ? 0 : 1;
+          const bTemRel = b.total>0 ? 0 : 1;
+          if(aTemRel !== bTemRel) return aTemRel - bTemRel;
+          return (a.nome||"").localeCompare(b.nome||"","pt-BR");
         });
         if(!clis.length) return null;
     return (
