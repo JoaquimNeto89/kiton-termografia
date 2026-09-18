@@ -507,16 +507,14 @@ ${footerPag()}
   <div style="padding:0 36px 16px;">
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       ${[
-        ["ANSI/NETA MTS-2023","Standard for Maintenance Testing Specifications.",false],
-        ["ABNT NBR 15763:2009","Termografia — Critérios de periodicidade de inspeção em sistemas elétricos de potência.",true],
-        ["ABNT NBR 15866:2010","Termografia — Metodologia de avaliação de temperatura de trabalho em sistemas elétricos.",true],
-        ["ABNT NBR 15572:2013","Termografia — Guia para inspeção de equipamentos elétricos e mecânicos.",true],
-        ["NR-13","Caldeiras, Vasos de Pressão e Tubulações. Termografia aceita como técnica preditiva complementar.",false],
-        ["ASTM E1932","Standard Guide for Thermographic Examination of Thermal Insulation Installations.",false]
-      ].map(([norm,desc,abnt],ri)=>`
+        ["ABNT NBR 15763:2009","Termografia — Critérios de periodicidade de inspeção em sistemas elétricos de potência."],
+        ["ABNT NBR 15866:2010","Termografia — Metodologia de avaliação de temperatura de trabalho em sistemas elétricos."],
+        ["ABNT NBR 15572:2013","Termografia — Guia para inspeção de equipamentos elétricos e mecânicos."],
+        ["ANSI/NETA MTS-2023","Standard for Maintenance Testing Specifications."]
+      ].map(([norm,desc],ri)=>`
       <tr style="background:${ri%2===0?"#fff":"#f9fafb"};">
-        <td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:700;white-space:nowrap;width:180px;${abnt?"font-style:italic;":""}">${norm}</td>
-        <td style="padding:8px 12px;border:1px solid #e5e7eb;${abnt?"font-style:italic;":""}">${desc}</td>
+        <td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:700;white-space:nowrap;width:180px;">${norm}</td>
+        <td style="padding:8px 12px;border:1px solid #e5e7eb;">${desc}</td>
       </tr>`).join("")}
     </table>
   </div>
