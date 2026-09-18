@@ -142,7 +142,7 @@ export default function App() {
           </div>
         </div>
         <nav style={{display:"flex",gap:4}}>
-          {[["dash","📊","Relatórios"],["form","＋","Novo"],["cadastros","🗂️","Cadastros"]].map(([v,icon,label])=>(
+          {[["dash","📊","Relatórios"],["form","📝","Novo"],["cadastros","🗂️","Cadastros"]].map(([v,icon,label])=>(
             <button key={v} onClick={()=>{ if(v==="form") setEditRel(null); setView(v); }}
               style={{padding:"7px 12px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",
                 background:view===v?"#CD0000":"transparent",color:view===v?"#fff":"#6b7280",whiteSpace:"nowrap"}}>
@@ -1011,7 +1011,7 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
         </div>
       ) : (
         <div style={{display:"flex",flexDirection:"column",gap:0}}><div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
-          <Btn onClick={onNew} primary style={{whiteSpace:"nowrap"}}>＋ Novo Relatório</Btn>
+          <Btn onClick={onNew} primary style={{whiteSpace:"nowrap"}}>📝 Novo Relatório</Btn>
         </div>
         <div style={{background:"#0f1422",border:"1px solid #1f2937",borderRadius:10,overflow:"hidden"}}>
           <div style={{padding:"10px 16px",borderBottom:"1px solid #1f2937",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
@@ -1240,14 +1240,17 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
         )}
       </div>
 
-      <div style={{display:"flex",justifyContent:"space-between",marginTop:20}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:20,gap:8}}>
         <Btn onClick={step===0?onCancel:()=>setStep(s=>s-1)}>{step===0?"Cancelar":"← Anterior"}</Btn>
         {step<1
-          ? <Btn onClick={()=>setStep(s=>s+1)} primary>Próximo →</Btn>
-          : <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
-              <Btn onClick={()=>setForm(f=>({...f,pontos:[...f.pontos,newPonto()]}))} style={{borderColor:"#3b82f6",color:"#60a5fa"}}>＋ Medição</Btn>
+          ? <>
               <Btn onClick={()=>onSave(form)} success>✅ Salvar Relatório</Btn>
-            </div>
+              <Btn onClick={()=>setStep(s=>s+1)} primary>Próximo →</Btn>
+            </>
+          : <>
+              <Btn onClick={()=>setForm(f=>({...f,pontos:[...f.pontos,newPonto()]}))} style={{borderColor:"#3b82f6",color:"#60a5fa"}}>＋ Adicionar Medição</Btn>
+              <Btn onClick={()=>onSave(form)} success>✅ Salvar Relatório</Btn>
+            </>
         }
       </div>
     </div>
