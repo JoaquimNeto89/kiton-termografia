@@ -196,7 +196,7 @@ export default function App() {
 function buildPizzaSVG(criticos,alertas,normais,total) {
   if(!total||total===0) return "";
   const data=[{l:"Crítico",v:criticos,c:"#CD0000"},{l:"Alerta",v:alertas,c:"#f59e0b"},{l:"Normal",v:normais,c:"#16a34a"}].filter(d=>d.v>0);
-  const cx=70,cy=70,r=60;
+  const cx=100,cy=100,r=85;
   let svgPaths="";
   if(data.length===1) {
     // Círculo sólido para caso de 100%
@@ -212,10 +212,10 @@ function buildPizzaSVG(criticos,alertas,normais,total) {
       return '<path d="M'+cx+','+cy+' L'+x1+','+y1+' A'+r+','+r+' 0 '+large+',1 '+x2+','+y2+' Z" fill="'+d.c+'" stroke="#fff" stroke-width="2"/>';
     }).join("");
   }
-  const svg='<svg viewBox="0 0 140 140" style="width:130px;height:130px;flex-shrink:0;">'+svgPaths+'<circle cx="'+cx+'" cy="'+cy+'" r="24" fill="#f8fafc"/><text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#111" font-size="14" font-weight="800" font-family="Arial">'+total+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#6b7280" font-size="8" font-family="Arial">TOTAL</text></svg>';
+  const svg='<svg viewBox="0 0 200 200" style="width:180px;height:180px;flex-shrink:0;">'+svgPaths+'<circle cx="'+cx+'" cy="'+cy+'" r="24" fill="#f8fafc"/><text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#111" font-size="14" font-weight="800" font-family="Arial">'+total+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#6b7280" font-size="8" font-family="Arial">TOTAL</text></svg>';
   const rows=[{l:"Crítico",v:criticos,c:"#CD0000"},{l:"Alerta",v:alertas,c:"#f59e0b"},{l:"Normal",v:normais,c:"#16a34a"}]
-    .map(function(s){return '<div style="display:flex;align-items:center;gap:10px;"><div style="width:12px;height:12px;border-radius:50%;background:'+s.c+';flex-shrink:0;"></div><div style="flex:1;font-size:13px;color:#6b7280;">'+s.l+'</div><div style="font-size:18px;font-weight:800;color:'+s.c+';">'+s.v+'</div><div style="font-size:12px;color:#9ca3af;width:36px;text-align:right;">'+Math.round(s.v/total*100)+'%</div></div>';}).join("");
-  return '<div style="margin:16px 36px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;"><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:-4px;">Distribuição por Severidade</div>'+svg+'<div style="display:flex;flex-direction:column;gap:8px;flex:1;">'+rows+'</div></div>';
+    .map(function(s){return '<div style="display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid #f0f0f0;"><div style="width:16px;height:16px;border-radius:50%;background:'+s.c+';flex-shrink:0;"></div><div style="flex:1;font-size:15px;color:#374151;font-weight:600;">'+s.l+'</div><div style="font-size:22px;font-weight:800;color:'+s.c+';">'+s.v+'</div><div style="font-size:14px;color:#9ca3af;width:44px;text-align:right;">'+Math.round(s.v/total*100)+'%</div></div>';}).join("");
+  return '<div style="margin:16px 36px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:20px 28px;display:flex;align-items:center;gap:32px;flex-wrap:wrap;"><div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:-4px;">Distribuição por Severidade</div>'+svg+'<div style="display:flex;flex-direction:column;gap:4px;flex:1;">'+rows+'</div></div>';
 }
 
 
@@ -344,7 +344,9 @@ function buildReportHTML(rel, todosRelatorios) {
       const pp = (r.pontos||[]).find(x=>x.equipamento===p.equipamento||x.tag===p.tag);
       return pp ? {data:r.dataRelatorio,dt:pp.deltaT,sev:pp.severidade} : null;
     }).filter(Boolean);
-    return `
+
+    // ── PÁGINA A: Identificação + Dados + Fotos ──────────────────────────────
+    const pageA = `
 <div class="page">
   ${header()}
   <div style="padding:14px 36px 0;">
@@ -374,17 +376,51 @@ function buildReportHTML(rel, todosRelatorios) {
     </table>
   </div>
   ${sec("Registros Fotográficos")}
-  <div style="padding:0 36px;display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">
-    ${p.fotoTermicaPreview?`<div style="text-align:center;"><div style="font-size:10px;font-weight:700;color:#6b7280;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;">📷 Imagem Termográfica</div><img src="${p.fotoTermicaPreview}" style="height:200px;border-radius:6px;border:2px solid #e5e7eb;"/></div>`:`<div style="text-align:center;padding:20px;border:2px dashed #e5e7eb;border-radius:8px;color:#9ca3af;font-size:12px;min-width:200px;">📷 Sem foto termográfica</div>`}
-    ${p.fotoRealPreview?`<div style="text-align:center;"><div style="font-size:10px;font-weight:700;color:#6b7280;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;">📸 Foto Real do Equipamento</div><img src="${p.fotoRealPreview}" style="height:200px;border-radius:6px;border:2px solid #e5e7eb;"/></div>`:`<div style="text-align:center;padding:20px;border:2px dashed #e5e7eb;border-radius:8px;color:#9ca3af;font-size:12px;min-width:200px;">📸 Sem foto real</div>`}
+  <div style="padding:0 36px;display:flex;gap:20px;justify-content:center;align-items:flex-start;flex:1;">
+    <div style="flex:1;text-align:center;">
+      <div style="font-size:10px;font-weight:700;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">📷 Imagem Termográfica</div>
+      ${p.fotoTermicaPreview
+        ? `<img src="${p.fotoTermicaPreview}" style="width:100%;max-height:340px;object-fit:contain;border-radius:6px;border:2px solid #e5e7eb;"/>`
+        : `<div style="border:2px dashed #e5e7eb;border-radius:8px;padding:60px 20px;color:#9ca3af;font-size:12px;">Sem foto termográfica</div>`}
+    </div>
+    <div style="flex:1;text-align:center;">
+      <div style="font-size:10px;font-weight:700;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">📸 Foto Real do Equipamento</div>
+      ${p.fotoRealPreview
+        ? `<img src="${p.fotoRealPreview}" style="width:100%;max-height:340px;object-fit:contain;border-radius:6px;border:2px solid #e5e7eb;"/>`
+        : `<div style="border:2px dashed #e5e7eb;border-radius:8px;padding:60px 20px;color:#9ca3af;font-size:12px;">Sem foto real</div>`}
+    </div>
   </div>
-  ${p.defeito||p.recomendacao||p.acaoExecutada?`
+  <div class="page-footer" style="background:#1C2633;padding:12px 36px;">
+    <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#94a3b8;"> — Inúmeras soluções, uma única empresa</span></div>
+    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
+  </div>
+</div>`;
+
+    // ── PÁGINA B: Diagnóstico + Observações + Histórico ──────────────────────
+    const pageB = `
+<div class="page">
+  ${header()}
+  <div style="padding:14px 36px 0;">
+    <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:700;color:#1C2633;">Medição #${i+1}${p.equipamento?" — "+p.equipamento:""} <span style="font-size:12px;font-weight:400;color:#6b7280;">(continuação)</span></div>
+  </div>
   ${sec("Diagnóstico e Ações")}
-  <div style="padding:0 36px;">
-    ${p.defeito?`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;margin-bottom:4px;">🔍 Defeito Encontrado</div><div style="background:#fef2f2;border-left:3px solid #CD0000;padding:8px 12px;border-radius:4px;font-size:12px;">${p.defeito}</div></div>`:""}
-    ${p.recomendacao?`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;margin-bottom:4px;">📋 Recomendação</div><div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 12px;border-radius:4px;font-size:12px;">${p.recomendacao}</div></div>`:""}
-    ${p.acaoExecutada?`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;margin-bottom:4px;">✅ Ação Executada</div><div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:8px 12px;border-radius:4px;font-size:12px;">${p.acaoExecutada}</div></div>`:""}
-  </div>`:""}
+  <div style="padding:0 36px;display:flex;flex-direction:column;gap:10px;">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;margin-bottom:4px;letter-spacing:.5px;">🔍 Defeito Encontrado</div>
+      <div style="background:#fef2f2;border-left:3px solid #CD0000;padding:10px 14px;border-radius:4px;font-size:12px;min-height:40px;">${p.defeito||"Nenhum defeito identificado."}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;margin-bottom:4px;letter-spacing:.5px;">📋 Recomendação</div>
+      <div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:10px 14px;border-radius:4px;font-size:12px;min-height:40px;">${p.recomendacao||"Manter monitoramento conforme periodicidade estabelecida."}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;margin-bottom:4px;letter-spacing:.5px;">✅ Ação Executada</div>
+      <div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:10px 14px;border-radius:4px;font-size:12px;min-height:40px;">${p.acaoExecutada||"Nenhuma ação executada até o momento."}</div>
+    </div>
+  </div>
+  ${p.observacoes?`
+  ${sec("Observações")}
+  <div style="padding:0 36px;"><div style="border:1px solid #e5e7eb;border-radius:6px;padding:10px 14px;font-size:12px;color:#374151;">${p.observacoes}</div></div>`:""}
   ${hist.length>0?`
   ${sec("Histórico deste Equipamento")}
   <div style="padding:0 36px;">
@@ -396,11 +432,14 @@ function buildReportHTML(rel, todosRelatorios) {
       </tbody>
     </table>
   </div>`:""}
-  ${p.observacoes?`${sec("Observações")}<div style="padding:0 36px;"><div style="border:1px solid #e5e7eb;border-radius:6px;padding:10px 14px;font-size:12px;color:#374151;">${p.observacoes}</div></div>`:""}
-  ${footer()}
+  <div class="page-footer" style="background:#1C2633;padding:12px 36px;">
+    <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#94a3b8;"> — Inúmeras soluções, uma única empresa</span></div>
+    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
+  </div>
 </div>`;
-  }).join("\n");
 
+    return pageA + pageB;
+  }).join("\n");
   // ── ÚLTIMA PÁGINA: CONCLUSÕES ─────────────────────────────────────────────
   const compRows = rels3.map((r,i)=>{
     const pts=r.pontos||[];
@@ -441,13 +480,21 @@ function buildReportHTML(rel, todosRelatorios) {
     </table>
   </div>`:""}
   ${sec("Referências Normativas")}
-  <div style="padding:0 36px 16px;font-size:12px;color:#374151;line-height:1.8;">
-    <div><b>ANSI/NETA MTS-2023</b> — Standard for Maintenance Testing Specifications.</div>
-    <div><b><i>ABNT NBR 15763:2009</i></b> — <i>Termografia — Critérios de periodicidade de inspeção em sistemas elétricos de potência.</i></div>
-    <div><b><i>ABNT NBR 15866:2010</i></b> — <i>Termografia — Metodologia de avaliação de temperatura de trabalho em sistemas elétricos.</i></div>
-    <div><b><i>ABNT NBR 15572:2013</i></b> — <i>Termografia — Guia para inspeção de equipamentos elétricos e mecânicos.</i></div>
-    <div><b>NR-13</b> — Caldeiras, Vasos de Pressão e Tubulações. Termografia aceita como técnica preditiva complementar.</div>
-    <div><b>ASTM E1932</b> — Standard Guide for Thermographic Examination of Thermal Insulation Installations.</div>
+  <div style="padding:0 36px 16px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      ${[
+        ["ANSI/NETA MTS-2023","Standard for Maintenance Testing Specifications.",false],
+        ["ABNT NBR 15763:2009","Termografia — Critérios de periodicidade de inspeção em sistemas elétricos de potência.",true],
+        ["ABNT NBR 15866:2010","Termografia — Metodologia de avaliação de temperatura de trabalho em sistemas elétricos.",true],
+        ["ABNT NBR 15572:2013","Termografia — Guia para inspeção de equipamentos elétricos e mecânicos.",true],
+        ["NR-13","Caldeiras, Vasos de Pressão e Tubulações. Termografia aceita como técnica preditiva complementar.",false],
+        ["ASTM E1932","Standard Guide for Thermographic Examination of Thermal Insulation Installations.",false]
+      ].map(([norm,desc,abnt],ri)=>`
+      <tr style="background:${ri%2===0?"#fff":"#f9fafb"};">
+        <td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:700;white-space:nowrap;width:180px;${abnt?"font-style:italic;":""}">${norm}</td>
+        <td style="padding:8px 12px;border:1px solid #e5e7eb;${abnt?"font-style:italic;":""}">${desc}</td>
+      </tr>`).join("")}
+    </table>
   </div>
   ${sec("Assinaturas")}
   <div style="padding:0 36px 24px;">
