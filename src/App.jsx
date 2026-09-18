@@ -243,11 +243,7 @@ function buildReportHTML(rel, todosRelatorios) {
     <span style="color:#fff;font-size:11px;">Data: ${fd(rel.dataRelatorio)}</span>
   </div>`; }
 
-  function footer() { return `
-  <div class="page-footer" style="background:#1C2633;padding:12px 36px;">
-    <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#e2e8f0;"> — Inúmeras soluções, uma única empresa</span></div>
-    <div style="font-size:10px;color:#e2e8f0;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
-  </div>`; }
+  function footer() { return footerPag(); }
 
   function sec(titulo) { return `<div style="font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;color:#1C2633;margin:20px 36px 8px;padding-bottom:4px;border-bottom:2px solid #CD0000;text-transform:uppercase;letter-spacing:.8px;">${titulo}</div>`; }
 
@@ -528,14 +524,13 @@ ${footerPag()}
   let paginaAtual = 0;
   function footerPag() {
     paginaAtual++;
-    return `
-  <div class="page-footer" style="background:#1C2633;padding:12px 36px;display:flex;align-items:center;justify-content:space-between;">
-    <div>
-      <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#e2e8f0;"> — Inúmeras soluções, uma única empresa</span></div>
-      <div style="font-size:10px;color:#e2e8f0;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
-    </div>
-    <div style="font-weight:700;color:#fff;font-size:11px;white-space:nowrap;margin-left:24px;">Página ${paginaAtual} de ${totalPaginas}</div>
-  </div>`;
+    return '<div class="page-footer" style="background:#1C2633;padding:12px 36px;display:flex;align-items:center;justify-content:space-between;">'
+      + '<div>'
+      + '<div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#e2e8f0;"> — Inúmeras soluções, uma única empresa</span></div>'
+      + '<div style="font-size:10px;color:#e2e8f0;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>'
+      + '</div>'
+      + '<div style="font-weight:700;color:#fff;font-size:11px;white-space:nowrap;margin-left:24px;">Página ' + paginaAtual + ' de ' + totalPaginas + '</div>'
+      + '</div>';
   }
 
   return `<!DOCTYPE html>
