@@ -299,7 +299,7 @@ function buildReportHTML(rel, todosRelatorios) {
   </div>
   ${buildPizzaSVG(criticos,alertas,normais,pontos.length)}
   <div style="flex:1;min-height:20px;"></div>
-  ${footer()}
+  ${footerPag()}
 </div>`;
 
   // ── ÍNDICE (com quebra de página automática) ────────────────────────────
@@ -342,7 +342,7 @@ function buildReportHTML(rel, todosRelatorios) {
       </tbody>
     </table>
   </div>
-  ${footer()}
+  ${footerPag()}
 </div>`).join("\n");
 
 
@@ -401,10 +401,7 @@ function buildReportHTML(rel, todosRelatorios) {
         : `<div style="border:2px dashed #e5e7eb;border-radius:8px;padding:60px 20px;color:#9ca3af;font-size:12px;">Sem foto real</div>`}
     </div>
   </div>
-  <div class="page-footer" style="background:#1C2633;padding:12px 36px;">
-    <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#e2e8f0;font-family:'Rajdhani',sans-serif;"> — Inúmeras soluções, uma única empresa</span></div>
-    <div style="font-size:10px;color:#e2e8f0;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
-  </div>
+${footerPag()}
 </div>`;
 
     // ── PÁGINA B: Diagnóstico + Observações + Histórico ──────────────────────
@@ -443,10 +440,7 @@ function buildReportHTML(rel, todosRelatorios) {
       </tbody>
     </table>
   </div>`:""}
-  <div class="page-footer" style="background:#1C2633;padding:12px 36px;">
-    <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#e2e8f0;font-family:'Rajdhani',sans-serif;"> — Inúmeras soluções, uma única empresa</span></div>
-    <div style="font-size:10px;color:#e2e8f0;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
-  </div>
+${footerPag()}
 </div>`;
 
     return pageA + pageB;
@@ -525,8 +519,24 @@ function buildReportHTML(rel, todosRelatorios) {
     </div>
   </div>
   <div style="flex:1;min-height:20px;"></div>
-  ${footer()}
+  ${footerPag()}
 </div>`;
+
+  // Calcular total de páginas
+  const numGruposIndice = Math.ceil(pontos.length / 20) || 1;
+  const totalPaginas = 1 + numGruposIndice + (pontos.length * 2) + 1;
+  let paginaAtual = 0;
+  function footerPag() {
+    paginaAtual++;
+    return `
+  <div class="page-footer" style="background:#1C2633;padding:12px 36px;display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#e2e8f0;"> — Inúmeras soluções, uma única empresa</span></div>
+      <div style="font-size:10px;color:#e2e8f0;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
+    </div>
+    <div style="font-weight:700;color:#fff;font-size:11px;white-space:nowrap;margin-left:24px;">Página ${paginaAtual} de ${totalPaginas}</div>
+  </div>`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -783,6 +793,7 @@ function CadClientes({ items, onSave, onDelete }) {
               </div>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <span style={{fontSize:12,color:"#4b5563"}}>{expanded===item.id?"▲":"▼"}</span>
+                <Btn small style={{borderColor:"#3b82f6",color:"#60a5fa"}} onClick={e=>{e.stopPropagation();setExpanded(expanded===item.id?null:item.id);}}>📋 {(item.equipamentos||[]).length}</Btn>
                 <Btn small onClick={e=>{e.stopPropagation();setForm({...item,equipamentos:item.equipamentos||[]})}}>✏️</Btn>
                 <Btn small danger onClick={e=>{e.stopPropagation();onDelete(item.id)}}>🗑️</Btn>
               </div>
@@ -832,12 +843,12 @@ function CadEquipamentos({ items, onChange }) {
         <span style={{fontSize:12,color:"#4b5563"}}>{items.length} equipamento(s)</span>
         <Btn small style={{borderColor:"#3b82f6",color:"#60a5fa"}} onClick={()=>setForm(emptyEq())}>＋ Equipamento</Btn>
       </div>
-      {items.map(eq=>(
+      {[...items].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"","pt-BR")).map(eq=>(
         <div key={eq.id} style={{background:"#0a1628",borderRadius:6,padding:"8px 12px",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
           <div style={{flex:1,fontSize:12}}>
             {eq.tag&&<span style={{color:"#f59e0b",fontWeight:700,marginRight:8}}>{eq.tag}</span>}
             <span style={{color:"#f1f5f9",fontWeight:600}}>{eq.nome}</span>
-            <span style={{color:"#4b5563",marginLeft:6}}>{eq.tipo}{eq.periodicidade?" · "+eq.periodicidade:""}</span>
+            <span style={{color:"#4b5563",marginLeft:6}}>{[eq.tipo,eq.periodicidade,eq.localizacao,eq.codigoArea].filter(Boolean).join(" · ")}</span>
           </div>
           <div style={{display:"flex",gap:6}}>
             <Btn small style={{borderColor:"#6366f1",color:"#818cf8"}} onClick={()=>{
@@ -1318,7 +1329,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
             }
           }} defaultValue="">
             <option value="">— Selecione para preencher automaticamente —</option>
-            {equipsCliente.map(eq=><option key={eq.id} value={eq.id}>{eq.tag?eq.tag+" — ":""}{eq.nome} ({eq.tipo})</option>)}
+            {[...equipsCliente].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"","pt-BR")).map(eq=><option key={eq.id} value={eq.id}>{eq.tag?eq.tag+" — ":""}{eq.nome}{[eq.tipo,eq.periodicidade,eq.localizacao,eq.codigoArea].filter(Boolean).length?" · "+[eq.tipo,eq.periodicidade,eq.localizacao,eq.codigoArea].filter(Boolean).join(" · "):""}</option>)}
           </select>
         </div>
       )}
