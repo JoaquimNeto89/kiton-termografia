@@ -88,6 +88,7 @@ export default function App() {
   const [comparCli,setComparCli]   = useState(null);
   const [toast,setToast]   = useState(null);
   const [cadTab,setCadTab] = useState("clientes");
+  const backupInputRef = useRef(null);
 
   useEffect(()=>{ save(data); },[data]);
 
@@ -129,6 +130,50 @@ export default function App() {
     showToast("Removido.","info");
   };
 
+  const handleExportBackup = () => {
+    const payload = { app:"kiton-termografia", schemaKey:SK, exportadoEm:new Date().toISOString(), data };
+    const blob = new Blob([JSON.stringify(payload,null,2)], {type:"application/json;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const hoje = new Date();
+    const dd = String(hoje.getDate()).padStart(2,"0");
+    const mm = String(hoje.getMonth()+1).padStart(2,"0");
+    const hh = String(hoje.getHours()).padStart(2,"0");
+    const min = String(hoje.getMinutes()).padStart(2,"0");
+    a.href = url;
+    a.download = `kiton-termografia-backup_${dd}-${mm}-${hoje.getFullYear()}_${hh}h${min}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`Backup exportado (${data.relatorios.length} relatórios, ${data.cadastros.clientes.length} clientes)!`);
+  };
+
+  const handleImportBackup = e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const parsed = JSON.parse(evt.target.result);
+        const incoming = parsed && parsed.data ? parsed.data : parsed;
+        if (!incoming || !Array.isArray(incoming.relatorios) || !incoming.cadastros) {
+          showToast("Arquivo inválido: não é um backup do sistema RTK.","erro");
+          return;
+        }
+        const okConfirm = confirm(
+          `Isso vai SUBSTITUIR todos os dados atuais neste dispositivo (${data.relatorios.length} relatórios) `+
+          `pelos ${incoming.relatorios.length} relatórios do arquivo de backup. Essa ação não pode ser desfeita. Confirma?`
+        );
+        if (!okConfirm) return;
+        setData(incoming);
+        showToast(`Backup restaurado (${incoming.relatorios.length} relatórios)!`);
+      } catch {
+        showToast("Erro ao ler o arquivo de backup.","erro");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   return (
     <div style={{fontFamily:"'Barlow',sans-serif",minHeight:"100vh",background:"#0b0e17",color:"#e2e8f0"}}>
       <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800&family=Rajdhani:wght@500;600;700&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
@@ -150,11 +195,24 @@ export default function App() {
               <span style={{marginLeft:4,display:"inline"}} className="hide-mobile">{label}</span>
             </button>
           ))}
+          <div style={{width:1,alignSelf:"stretch",background:"#374151",margin:"0 2px"}}/>
+          <button onClick={handleExportBackup} title="Baixar backup completo (relatórios + cadastros) em .json"
+            style={{padding:"7px 14px",borderRadius:6,border:"1px solid #374151",cursor:"pointer",fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",background:"transparent",color:"#94a3b8",whiteSpace:"nowrap"}}>
+            <span>💾</span>
+            <span style={{marginLeft:4,display:"inline"}} className="hide-mobile">Backup</span>
+          </button>
+          <button onClick={()=>backupInputRef.current?.click()} title="Restaurar dados a partir de um arquivo de backup .json"
+            style={{padding:"7px 14px",borderRadius:6,border:"1px solid #374151",cursor:"pointer",fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",background:"transparent",color:"#94a3b8",whiteSpace:"nowrap"}}>
+            <span>📤</span>
+            <span style={{marginLeft:4,display:"inline"}} className="hide-mobile">Restaurar</span>
+          </button>
+          <input ref={backupInputRef} type="file" accept="application/json,.json" onChange={handleImportBackup}
+            style={{position:"absolute",opacity:0,width:1,height:1,pointerEvents:"none"}}/>
         </nav>
       </header>
 
       {toast && (
-        <div style={{position:"fixed",top:70,right:20,zIndex:9999,background:toast.t==="ok"?"#16a34a":"#2563eb",
+        <div style={{position:"fixed",top:70,right:20,zIndex:9999,background:toast.t==="ok"?"#16a34a":toast.t==="erro"?"#dc2626":"#2563eb",
           color:"#fff",padding:"10px 20px",borderRadius:8,fontWeight:600,fontSize:14,boxShadow:"0 8px 32px rgba(0,0,0,.5)"}}>
           {toast.msg}
         </div>
