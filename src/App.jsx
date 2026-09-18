@@ -245,8 +245,8 @@ function buildReportHTML(rel, todosRelatorios) {
 
   function footer() { return `
   <div class="page-footer" style="background:#1C2633;padding:12px 36px;">
-    <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA</div>
-    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
+    <div style="font-weight:700;color:#fff;font-size:11px;">KITON ENGENHARIA INTEGRADA LTDA <span style="font-style:italic;font-weight:400;color:#e2e8f0;"> — Inúmeras soluções, uma única empresa</span></div>
+    <div style="font-size:10px;color:#e2e8f0;margin-top:2px;">CNPJ 29.234.872/0001-04 · CREA-PR 76327 · Av. Dr. Mario Clapier Urbinati, 1434, Jd. Canadá, 87080-120, Maringá-PR<br/>(44) 4141-0714 · (44) 99731-1914 · contato@kitonengenharia.com.br · www.kitonengenharia.com.br</div>
   </div>`; }
 
   function sec(titulo) { return `<div style="font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;color:#1C2633;margin:20px 36px 8px;padding-bottom:4px;border-bottom:2px solid #CD0000;text-transform:uppercase;letter-spacing:.8px;">${titulo}</div>`; }
@@ -314,7 +314,7 @@ function buildReportHTML(rel, todosRelatorios) {
   const pageIndice = gruposIndice.map((grupo, gi) => `
 <div class="page">
   ${header()}
-  ${sec("Índice de Medições"+(gi>0?" (continuação "+( gi+1)+"º parte)":""))}
+  ${sec("Índice de Medições"+(gi>0?" (continuação)":""))}
   <div style="padding:0 36px;">
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="background:#1C2633;">
@@ -840,6 +840,10 @@ function CadEquipamentos({ items, onChange }) {
             <span style={{color:"#4b5563",marginLeft:6}}>{eq.tipo}{eq.periodicidade?" · "+eq.periodicidade:""}</span>
           </div>
           <div style={{display:"flex",gap:6}}>
+            <Btn small style={{borderColor:"#6366f1",color:"#818cf8"}} onClick={()=>{
+              const clone = {...eq, id:Date.now()+"", nome:(eq.nome||"")+" (cópia)"};
+              onChange([...items, clone]);
+            }}>⧉</Btn>
             <Btn small onClick={()=>setForm({...eq})}>✏️</Btn>
             <Btn small danger onClick={()=>onChange(items.filter(x=>x.id!==eq.id))}>🗑️</Btn>
           </div>
