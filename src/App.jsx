@@ -26,6 +26,15 @@ const calcSev   = (dt, tipo) => { const d = parseFloat(dt); if (isNaN(d)||d<0) r
 const calcMedia = (mx,mn)   => { const a=parseFloat(mx),b=parseFloat(mn); return isNaN(a)||isNaN(b)?"":((a+b)/2).toFixed(1); };
 const calcDelta = (mx,rf)   => { const a=parseFloat(mx),b=parseFloat(rf); return isNaN(a)||isNaN(b)?"":(a-b).toFixed(1); };
 const fmtDate   = d         => d ? new Date(d+"T12:00").toLocaleDateString("pt-BR") : "—";
+const fmtRelTime = ts => {
+  if (!ts) return null;
+  const min = Math.floor(Math.max(0, Date.now() - ts) / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h}h`;
+  return `há ${Math.floor(h / 24)}d`;
+};
 
 const newPonto = () => ({
   id: Date.now()+Math.random(),
@@ -96,12 +105,17 @@ export default function App() {
   const [cadTab,setCadTab] = useState("clientes");
   const backupInputRef = useRef(null);
   const [driveSyncing,setDriveSyncing] = useState(false);
+  const [driveMeta,setDriveMeta] = useState(loadDriveMeta);
+  const [nowTick,setNowTick] = useState(Date.now());
+  const dirtyRef = useRef(false); // true = há mudança local ainda não enviada ao Drive
 
   useEffect(()=>{ save(data); },[data]);
+  useEffect(()=>{ const t=setInterval(()=>setNowTick(Date.now()),30000); return ()=>clearInterval(t); },[]);
 
   const showToast = (msg,t="ok") => { setToast({msg,t}); setTimeout(()=>setToast(null),3000); };
 
   const handleSave = rel => {
+    dirtyRef.current = true;
     setData(prev => {
       const exists = prev.relatorios.find(r=>r.id===rel.id);
       const relatorios = exists ? prev.relatorios.map(r=>r.id===rel.id?rel:r) : [...prev.relatorios,rel];
@@ -112,6 +126,7 @@ export default function App() {
   };
 
   const handleSaveCadastro = (tipo, item) => {
+    dirtyRef.current = true;
     setData(prev => {
       const cads = prev.cadastros || {...INITIAL.cadastros};
       const lista = cads[tipo] || [];
@@ -124,6 +139,7 @@ export default function App() {
 
   const handleDeleteCadastro = (tipo, id) => {
     if (!confirm("Remover cadastro?")) return;
+    dirtyRef.current = true;
     setData(prev => {
       const cads = prev.cadastros || {...INITIAL.cadastros};
       return {...prev, cadastros:{...cads,[tipo]:(cads[tipo]||[]).filter(x=>x.id!==id)}};
@@ -133,6 +149,7 @@ export default function App() {
 
   const handleDelete = id => {
     if (!confirm("Remover permanentemente?")) return;
+    dirtyRef.current = true;
     setData(prev=>({...prev,relatorios:prev.relatorios.filter(r=>r.id!==id)}));
     showToast("Removido.","info");
   };
@@ -171,6 +188,7 @@ export default function App() {
           `pelos ${incoming.relatorios.length} relatórios do arquivo de backup. Essa ação não pode ser desfeita. Confirma?`
         );
         if (!okConfirm) return;
+        dirtyRef.current = true;
         setData(incoming);
         showToast(`Backup restaurado (${incoming.relatorios.length} relatórios)!`);
       } catch {
@@ -181,16 +199,26 @@ export default function App() {
     e.target.value = "";
   };
 
-  const handleSyncDrive = async () => {
+  // silent:true = chamada automática (ao abrir o app ou depois de salvar), sem caixas de diálogo.
+  // Nesse modo, qualquer decisão importante (primeira sync do dispositivo, conflito real) é pulada
+  // e fica para o clique manual no botão Drive resolver, nunca decide sozinha o que pode perder dado.
+  const syncDrive = async ({ silent = false } = {}) => {
     if (driveSyncing) return;
+    let meta = loadDriveMeta();
+    if (silent && !meta.fileId) return; // este dispositivo nunca conectou ao Drive, não faz nada sozinho
+
     setDriveSyncing(true);
+    const marcarSincronizado = novoMeta => {
+      const m = { ...meta, ...novoMeta, lastSyncedAt: Date.now() };
+      saveDriveMeta(m); setDriveMeta(m); meta = m;
+      dirtyRef.current = false;
+    };
+
     try {
-      let meta = loadDriveMeta();
       let fileId = meta.fileId;
       if (!fileId) {
         fileId = await Drive.findOrCreateFile();
-        meta = { ...meta, fileId };
-        saveDriveMeta(meta);
+        marcarSincronizado({ fileId });
       }
 
       const remoteInfo = await Drive.getFileMeta(fileId);
@@ -198,8 +226,9 @@ export default function App() {
       const isFirstSyncNesteDispositivo = !meta.lastRemoteModified;
       const remoteMudouDesdeUltimoSync = !isFirstSyncNesteDispositivo && remoteModified !== meta.lastRemoteModified;
 
-      // Primeira sincronização deste dispositivo: se os dois lados já têm dados, pergunta qual prevalece.
+      // Primeira sincronização deste dispositivo: decisão importante demais para ser automática.
       if (isFirstSyncNesteDispositivo) {
+        if (silent) { setDriveSyncing(false); return; }
         const remoteData = await Drive.downloadFile(fileId);
         const remoteTemDados = remoteData && Array.isArray(remoteData.relatorios) && remoteData.relatorios.length > 0;
         const localTemDados = data.relatorios.length > 0;
@@ -214,12 +243,12 @@ export default function App() {
           );
           if (usarNuvem) {
             setData(remoteData);
-            saveDriveMeta({ fileId, lastRemoteModified: remoteModified });
+            marcarSincronizado({ lastRemoteModified: remoteModified });
             showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
           } else {
             await Drive.uploadFile(fileId, data);
             const novo = await Drive.getFileMeta(fileId);
-            saveDriveMeta({ fileId, lastRemoteModified: novo.modifiedTime });
+            marcarSincronizado({ lastRemoteModified: novo.modifiedTime });
             showToast("Dados deste dispositivo enviados para a nuvem!");
           }
           setDriveSyncing(false);
@@ -227,38 +256,76 @@ export default function App() {
         }
         if (remoteTemDados && !localTemDados) {
           setData(remoteData);
-          saveDriveMeta({ fileId, lastRemoteModified: remoteModified });
+          marcarSincronizado({ lastRemoteModified: remoteModified });
           showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
           setDriveSyncing(false);
           return;
         }
         // nenhum dos dois tem dados, ou só o local tem: segue o fluxo normal abaixo (envia local)
       } else if (remoteMudouDesdeUltimoSync) {
-        const usarNuvem = confirm(
-          `A versão na nuvem foi atualizada (por outro dispositivo ou pessoa) desde a última sincronização deste aqui.\n\n`+
-          `OK = trazer a versão da nuvem (substitui os dados deste dispositivo).\n`+
-          `Cancelar = enviar a versão deste dispositivo mesmo assim (substitui a da nuvem).`
-        );
-        if (usarNuvem) {
+        if (dirtyRef.current) {
+          // conflito de verdade: os dois lados mudaram. No automático, só avisa e deixa para o clique manual.
+          if (silent) {
+            setDriveSyncing(false);
+            showToast("A nuvem foi atualizada em outro dispositivo. Clique em Drive para revisar.", "info");
+            return;
+          }
+          const usarNuvem = confirm(
+            `A versão na nuvem foi atualizada (por outro dispositivo ou pessoa) desde a última sincronização deste aqui.\n\n`+
+            `OK = trazer a versão da nuvem (substitui os dados deste dispositivo).\n`+
+            `Cancelar = enviar a versão deste dispositivo mesmo assim (substitui a da nuvem).`
+          );
+          if (usarNuvem) {
+            const remoteData = await Drive.downloadFile(fileId);
+            setData(remoteData);
+            marcarSincronizado({ lastRemoteModified: remoteModified });
+            showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
+            setDriveSyncing(false);
+            return;
+          }
+        } else {
+          // nuvem mudou, mas este dispositivo não tem edição própria pendente: seguro trazer sozinho.
           const remoteData = await Drive.downloadFile(fileId);
           setData(remoteData);
-          saveDriveMeta({ fileId, lastRemoteModified: remoteModified });
-          showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
+          marcarSincronizado({ lastRemoteModified: remoteModified });
+          if (!silent) showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
           setDriveSyncing(false);
           return;
         }
       }
 
+      if (!dirtyRef.current && !isFirstSyncNesteDispositivo) {
+        // nada mudou de nenhum lado, nada a enviar
+        setDriveSyncing(false);
+        return;
+      }
+
       await Drive.uploadFile(fileId, data);
       const novo = await Drive.getFileMeta(fileId);
-      saveDriveMeta({ fileId, lastRemoteModified: novo.modifiedTime });
-      showToast(`Sincronizado com o Drive (${data.relatorios.length} relatórios)!`);
+      marcarSincronizado({ lastRemoteModified: novo.modifiedTime });
+      if (!silent) showToast(`Sincronizado com o Drive (${data.relatorios.length} relatórios)!`);
     } catch (err) {
-      showToast("Erro ao sincronizar com o Drive: " + err.message, "erro");
+      if (!silent) showToast("Erro ao sincronizar com o Drive: " + err.message, "erro");
+      // no modo automático, falha fica silenciosa (ex: precisa de login interativo) — não alarma à toa
     } finally {
       setDriveSyncing(false);
     }
   };
+
+  // Sincronização automática: tenta buscar/enviar sozinho ao abrir o app e depois de qualquer
+  // alteração local, sempre em modo silencioso (nunca decide um conflito real sozinho).
+  useEffect(() => { syncDrive({ silent:true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!dirtyRef.current) return;
+    const t = setTimeout(() => syncDrive({ silent:true }), 1200);
+    return () => clearTimeout(t);
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  void nowTick; // força recálculo do texto de tempo relativo a cada 30s (ver useEffect acima)
+  const driveRel = fmtRelTime(driveMeta.lastSyncedAt);
+  const driveLabel = driveSyncing ? "Sincronizando…" : driveRel ? `Drive · ${driveRel}` : "Drive";
+  const driveAgeMin = driveMeta.lastSyncedAt ? (Date.now() - driveMeta.lastSyncedAt) / 60000 : Infinity;
+  const driveDotColor = !driveMeta.lastSyncedAt ? "#4b5563" : driveAgeMin < 60 ? "#22c55e" : driveAgeMin < 24*60 ? "#f59e0b" : "#ef4444";
 
   return (
     <div style={{fontFamily:"'Barlow',sans-serif",minHeight:"100vh",background:"#0b0e17",color:"#e2e8f0"}}>
@@ -295,10 +362,14 @@ export default function App() {
           <input ref={backupInputRef} type="file" accept="application/json,.json" onChange={handleImportBackup}
             style={{position:"absolute",opacity:0,width:1,height:1,pointerEvents:"none"}}/>
           <div style={{width:1,alignSelf:"stretch",background:"#374151",margin:"0 2px"}}/>
-          <button onClick={handleSyncDrive} disabled={driveSyncing} title="Sincronizar relatórios e cadastros com o Google Drive"
-            style={{padding:"7px 14px",borderRadius:6,border:"1px solid #374151",cursor:driveSyncing?"default":"pointer",fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",background:"transparent",color:driveSyncing?"#4b5563":"#94a3b8",whiteSpace:"nowrap",opacity:driveSyncing?0.7:1}}>
-            <span>{driveSyncing ? "⏳" : "🔄"}</span>
-            <span style={{marginLeft:4,display:"inline"}} className="hide-mobile">{driveSyncing ? "Sincronizando…" : "Drive"}</span>
+          <button onClick={()=>syncDrive({silent:false})} disabled={driveSyncing}
+            title={driveMeta.lastSyncedAt ? `Última sincronização: ${new Date(driveMeta.lastSyncedAt).toLocaleString("pt-BR")}` : "Ainda não sincronizado neste dispositivo"}
+            style={{position:"relative",padding:"7px 14px",borderRadius:6,border:"1px solid #374151",cursor:driveSyncing?"default":"pointer",fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",background:"transparent",color:driveSyncing?"#4b5563":"#94a3b8",whiteSpace:"nowrap",opacity:driveSyncing?0.7:1}}>
+            <span style={{position:"relative"}}>
+              {driveSyncing ? "⏳" : "🔄"}
+              <span className="hide-desktop" style={{position:"absolute",top:-2,right:-2,width:7,height:7,borderRadius:"50%",background:driveDotColor,border:"1px solid #0f1422"}}/>
+            </span>
+            <span style={{marginLeft:4,display:"inline"}} className="hide-mobile">{driveLabel}</span>
           </button>
         </nav>
       </header>
@@ -329,6 +400,7 @@ export default function App() {
         .topnav{scrollbar-width:thin;}
         .topnav>*{flex-shrink:0;}
         .topnav::-webkit-scrollbar{height:3px;}
+        .hide-desktop{display:none;}
         @media print{body{background:#fff!important;color:#000!important;}}
         @media(max-width:640px){
           .grid-3{grid-template-columns:1fr!important;}
@@ -342,6 +414,7 @@ export default function App() {
         /* Cabeçalho: reage à largura real da tela (celular OU janela de navegador estreita), não só a "é celular?" */
         @media(max-width:1050px){
           .hide-mobile{display:none!important;}
+          .hide-desktop{display:inline-block!important;}
           .topnav button{padding:7px 9px!important;}
           .topheader{flex-direction:column!important;height:auto!important;padding:10px 16px!important;gap:6px;}
           .topheader-brand{justify-content:center;}
