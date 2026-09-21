@@ -78,6 +78,9 @@ const load = () => {
 const save = d => { try { localStorage.setItem(SK,JSON.stringify(d)); } catch {} };
 
 // Metadados da sincronização com o Drive (ID do arquivo remoto + última versão conhecida)
+const WHATSAPP_NUMBER = "5544997311914";
+const WHATSAPP_MENSAGEM = "Eng. Joaquim Neto, estou com uma dúvida no sistema de Relatórios de Termografia da Kiton Engenharia Integrada.";
+
 const DK = "kiton_termo_drive_meta_v1";
 const loadDriveMeta = () => { try { return JSON.parse(localStorage.getItem(DK)) || {}; } catch { return {}; } };
 const saveDriveMeta = m => { try { localStorage.setItem(DK,JSON.stringify(m)); } catch {} };
@@ -209,8 +212,9 @@ export default function App() {
     if (silent && !meta.fileId) return; // este dispositivo nunca conectou ao Drive, não faz nada sozinho
 
     setDriveSyncing(true);
+    let ownerEmail = meta.ownerEmail || null; // e-mail da conta Google dona do arquivo na nuvem (só para exibir no rodapé)
     const marcarSincronizado = novoMeta => {
-      const m = { ...meta, ...novoMeta, lastSyncedAt: Date.now() };
+      const m = { ...meta, ...novoMeta, ownerEmail, lastSyncedAt: Date.now() };
       saveDriveMeta(m); setDriveMeta(m); meta = m;
       dirtyRef.current = false;
     };
@@ -223,6 +227,7 @@ export default function App() {
       }
 
       const remoteInfo = await Drive.getFileMeta(fileId);
+      ownerEmail = remoteInfo.owners?.[0]?.emailAddress || ownerEmail;
       const remoteModified = remoteInfo.modifiedTime;
       const isFirstSyncNesteDispositivo = !meta.lastRemoteModified;
       const remoteMudouDesdeUltimoSync = !isFirstSyncNesteDispositivo && remoteModified !== meta.lastRemoteModified;
@@ -249,6 +254,7 @@ export default function App() {
           } else {
             await Drive.uploadFile(fileId, data);
             const novo = await Drive.getFileMeta(fileId);
+            ownerEmail = novo.owners?.[0]?.emailAddress || ownerEmail;
             marcarSincronizado({ lastRemoteModified: novo.modifiedTime });
             showToast("Dados deste dispositivo enviados para a nuvem!");
           }
@@ -303,6 +309,7 @@ export default function App() {
 
       await Drive.uploadFile(fileId, data);
       const novo = await Drive.getFileMeta(fileId);
+      ownerEmail = novo.owners?.[0]?.emailAddress || ownerEmail;
       marcarSincronizado({ lastRemoteModified: novo.modifiedTime });
       if (!silent) showToast(`Sincronizado com o Drive (${data.relatorios.length} relatórios)!`);
     } catch (err) {
@@ -436,12 +443,24 @@ export default function App() {
         </div>
       )}
 
-      <main style={{maxWidth:1120,margin:"0 auto",padding:"20px 16px"}}>
+      <main style={{maxWidth:1120,margin:"0 auto",padding:"20px 16px 44px"}}>
         {view==="dash" && <Dashboard data={data} onNew={()=>{setEditRel(null);setView("form");}} onEdit={r=>{setEditRel(r);setView("form");}} onDelete={handleDelete} onCompar={c=>{setComparCli(c);setView("comp");}} onPdf={r=>exportPDF(r,data.relatorios)} onJpg={r=>exportJPG(r,data.relatorios)} />}
         {view==="form" && <FormRel initial={editRel} onSave={handleSave} onCancel={()=>setView("dash")} cadastros={data.cadastros} relatorios={data.relatorios} />}
         {view==="comp" && <Comparativo cliente={comparCli} relatorios={data.relatorios} onBack={()=>setView("dash")} />}
         {view==="cadastros" && <Cadastros cadastros={data.cadastros} onSave={handleSaveCadastro} onDelete={handleDeleteCadastro} tab={cadTab} setTab={setCadTab}/>}
       </main>
+
+      <footer style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"#0f1422",borderTop:"1px solid #374151",padding:"7px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+        <span style={{fontSize:11,color:"#6b7280",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}}
+          title={driveMeta.ownerEmail ? `Banco de dados sincronizado com: ${driveMeta.ownerEmail}` : "Nenhuma conta do Drive sincronizada neste dispositivo"}>
+          📁 {driveMeta.ownerEmail || "Nenhuma conta sincronizada"}
+        </span>
+        <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MENSAGEM)}`}
+          target="_blank" rel="noopener noreferrer"
+          style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:5,background:"#16a34a",color:"#fff",fontWeight:700,fontSize:11,textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>
+          🆘 Ajuda
+        </a>
+      </footer>
 
       <style>{`
         *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
