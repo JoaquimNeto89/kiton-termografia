@@ -313,8 +313,22 @@ export default function App() {
       marcarSincronizado({ lastRemoteModified: novo.modifiedTime });
       if (!silent) showToast(`Sincronizado com o Drive (${data.relatorios.length} relatórios)!`);
     } catch (err) {
-      if (!silent) showToast("Erro ao sincronizar com o Drive: " + err.message, "erro");
-      // no modo automático, falha fica silenciosa (ex: precisa de login interativo) — não alarma à toa
+      // 404/403 aqui quase sempre significa que a tela de login do Google (que reaparece a cada
+      // recarregamento da página, se o navegador tiver mais de uma conta logada) foi respondida
+      // com uma conta diferente da que este dispositivo já usa para salvar os dados. Esse caso avisa
+      // mesmo em modo silencioso, porque senão fica parecendo que sincronizou e na verdade não fez nada.
+      const contaProvavelmenteErrada = err.status === 404 || err.status === 403;
+      if (contaProvavelmenteErrada) {
+        alert(
+          "Não sincronizou: a conta Google usada agora parece ser diferente da que este dispositivo já usa "+
+          "para salvar os dados"+(meta.ownerEmail ? ` (${meta.ownerEmail})` : "")+".\n\n"+
+          "Clique OK, recarregue a página e, na tela de login do Google, escolha "+
+          (meta.ownerEmail ? `a conta ${meta.ownerEmail}` : "a mesma conta de sempre")+"."
+        );
+      } else if (!silent) {
+        showToast("Erro ao sincronizar com o Drive: " + err.message, "erro");
+      }
+      // fora desse caso, falha no modo automático fica silenciosa (ex: precisa de login interativo) — não alarma à toa
     } finally {
       setDriveSyncing(false);
     }
