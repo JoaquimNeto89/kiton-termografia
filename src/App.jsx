@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { LOGO_B64 } from "./logo.js";
+import * as Drive from "./drive.js";
 // ─── NBR 15763 ────────────────────────────────────────────────────────────────
 const NBR = {
   "Painel Elétrico":        { alerta: 10, critico: 20, ref: "Fase adjacente em mesma carga" },
@@ -67,6 +68,11 @@ const load = () => {
 };
 const save = d => { try { localStorage.setItem(SK,JSON.stringify(d)); } catch {} };
 
+// Metadados da sincronização com o Drive (ID do arquivo remoto + última versão conhecida)
+const DK = "kiton_termo_drive_meta_v1";
+const loadDriveMeta = () => { try { return JSON.parse(localStorage.getItem(DK)) || {}; } catch { return {}; } };
+const saveDriveMeta = m => { try { localStorage.setItem(DK,JSON.stringify(m)); } catch {} };
+
 // Gerar número de relatório sequencial RTK-XXX/AA
 function gerarNumRelatorio(relatorios) {
   const ano = new Date().getFullYear().toString().slice(-2);
@@ -89,6 +95,7 @@ export default function App() {
   const [toast,setToast]   = useState(null);
   const [cadTab,setCadTab] = useState("clientes");
   const backupInputRef = useRef(null);
+  const [driveSyncing,setDriveSyncing] = useState(false);
 
   useEffect(()=>{ save(data); },[data]);
 
@@ -174,6 +181,85 @@ export default function App() {
     e.target.value = "";
   };
 
+  const handleSyncDrive = async () => {
+    if (driveSyncing) return;
+    setDriveSyncing(true);
+    try {
+      let meta = loadDriveMeta();
+      let fileId = meta.fileId;
+      if (!fileId) {
+        fileId = await Drive.findOrCreateFile();
+        meta = { ...meta, fileId };
+        saveDriveMeta(meta);
+      }
+
+      const remoteInfo = await Drive.getFileMeta(fileId);
+      const remoteModified = remoteInfo.modifiedTime;
+      const isFirstSyncNesteDispositivo = !meta.lastRemoteModified;
+      const remoteMudouDesdeUltimoSync = !isFirstSyncNesteDispositivo && remoteModified !== meta.lastRemoteModified;
+
+      // Primeira sincronização deste dispositivo: se os dois lados já têm dados, pergunta qual prevalece.
+      if (isFirstSyncNesteDispositivo) {
+        const remoteData = await Drive.downloadFile(fileId);
+        const remoteTemDados = remoteData && Array.isArray(remoteData.relatorios) && remoteData.relatorios.length > 0;
+        const localTemDados = data.relatorios.length > 0;
+
+        if (remoteTemDados && localTemDados) {
+          const usarNuvem = confirm(
+            `Primeira sincronização deste dispositivo.\n\n`+
+            `Na nuvem: ${remoteData.relatorios.length} relatório(s).\n`+
+            `Neste dispositivo: ${data.relatorios.length} relatório(s).\n\n`+
+            `OK = trazer os dados da nuvem para este dispositivo (substitui os daqui).\n`+
+            `Cancelar = enviar os dados deste dispositivo para a nuvem (substitui os de lá).`
+          );
+          if (usarNuvem) {
+            setData(remoteData);
+            saveDriveMeta({ fileId, lastRemoteModified: remoteModified });
+            showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
+          } else {
+            await Drive.uploadFile(fileId, data);
+            const novo = await Drive.getFileMeta(fileId);
+            saveDriveMeta({ fileId, lastRemoteModified: novo.modifiedTime });
+            showToast("Dados deste dispositivo enviados para a nuvem!");
+          }
+          setDriveSyncing(false);
+          return;
+        }
+        if (remoteTemDados && !localTemDados) {
+          setData(remoteData);
+          saveDriveMeta({ fileId, lastRemoteModified: remoteModified });
+          showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
+          setDriveSyncing(false);
+          return;
+        }
+        // nenhum dos dois tem dados, ou só o local tem: segue o fluxo normal abaixo (envia local)
+      } else if (remoteMudouDesdeUltimoSync) {
+        const usarNuvem = confirm(
+          `A versão na nuvem foi atualizada (por outro dispositivo ou pessoa) desde a última sincronização deste aqui.\n\n`+
+          `OK = trazer a versão da nuvem (substitui os dados deste dispositivo).\n`+
+          `Cancelar = enviar a versão deste dispositivo mesmo assim (substitui a da nuvem).`
+        );
+        if (usarNuvem) {
+          const remoteData = await Drive.downloadFile(fileId);
+          setData(remoteData);
+          saveDriveMeta({ fileId, lastRemoteModified: remoteModified });
+          showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
+          setDriveSyncing(false);
+          return;
+        }
+      }
+
+      await Drive.uploadFile(fileId, data);
+      const novo = await Drive.getFileMeta(fileId);
+      saveDriveMeta({ fileId, lastRemoteModified: novo.modifiedTime });
+      showToast(`Sincronizado com o Drive (${data.relatorios.length} relatórios)!`);
+    } catch (err) {
+      showToast("Erro ao sincronizar com o Drive: " + err.message, "erro");
+    } finally {
+      setDriveSyncing(false);
+    }
+  };
+
   return (
     <div style={{fontFamily:"'Barlow',sans-serif",minHeight:"100vh",background:"#0b0e17",color:"#e2e8f0"}}>
       <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800&family=Rajdhani:wght@500;600;700&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet"/>
@@ -208,6 +294,12 @@ export default function App() {
           </button>
           <input ref={backupInputRef} type="file" accept="application/json,.json" onChange={handleImportBackup}
             style={{position:"absolute",opacity:0,width:1,height:1,pointerEvents:"none"}}/>
+          <div style={{width:1,alignSelf:"stretch",background:"#374151",margin:"0 2px"}}/>
+          <button onClick={handleSyncDrive} disabled={driveSyncing} title="Sincronizar relatórios e cadastros com o Google Drive"
+            style={{padding:"7px 14px",borderRadius:6,border:"1px solid #374151",cursor:driveSyncing?"default":"pointer",fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",background:"transparent",color:driveSyncing?"#4b5563":"#94a3b8",whiteSpace:"nowrap",opacity:driveSyncing?0.7:1}}>
+            <span>{driveSyncing ? "⏳" : "🔄"}</span>
+            <span style={{marginLeft:4,display:"inline"}} className="hide-mobile">{driveSyncing ? "Sincronizando…" : "Drive"}</span>
+          </button>
         </nav>
       </header>
 
