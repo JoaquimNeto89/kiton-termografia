@@ -115,6 +115,15 @@ function calcSeveridade(ponto, criterio) {
 }
 const calcMedia = (mx,mn)   => { const a=parseFloat(mx),b=parseFloat(mn); return isNaN(a)||isNaN(b)?"":((a+b)/2).toFixed(1); };
 const calcDelta = (mx,rf)   => { const a=parseFloat(mx),b=parseFloat(rf); return isNaN(a)||isNaN(b)?"":(a-b).toFixed(1); };
+// Fator de carga (%) = maior corrente de fase medida / corrente nominal. Retorna null (não calculável)
+// quando faltar a nominal ou nenhuma fase estiver preenchida — nesses casos o campo fica manual.
+const calcFatorCarga = p => {
+  const nom = parseFloat(p.corrNom);
+  if (isNaN(nom) || nom<=0) return null;
+  const fases = [p.corrR,p.corrS,p.corrT].map(v=>parseFloat(v)).filter(v=>!isNaN(v));
+  if (fases.length===0) return null;
+  return ((Math.max(...fases)/nom)*100).toFixed(1);
+};
 const fmtDate   = d         => d ? new Date(d+"T12:00").toLocaleDateString("pt-BR") : "—";
 const fmtRelTime = ts => {
   if (!ts) return null;
@@ -135,7 +144,7 @@ const newPonto = () => ({
   emissividade: "0.95", transmissao: "1.00",
   tempAmb: "", umidade: "", condicaoAmb: "",
   tempMax: "", tempMin: "", tempMedia: "", tempRef: "", deltaT: "",
-  fatorCarga: "",
+  fatorCarga: "", fatorCargaAuto: false,
   corrR: "", corrS: "", corrT: "", corrNom: "",
   severidade: "normal",
   severidadeAuto: false, cfca: null, criterioSnapshot: null,
@@ -251,6 +260,36 @@ export default function App() {
     });
     showToast("Relatório salvo!");
     setView("dash"); setEditRel(null);
+  };
+
+  // Clona um relatório existente (ex.: rotina mensal com os mesmos equipamentos/cliente): mantém os
+  // parâmetros do equipamento e da inspeção (cliente, local, técnico, instrumentos, tipo, localização,
+  // condições ambientais/correntes) e limpa apenas o que é específico da visita: data/hora de cada
+  // medição, nº da OS, nº da ART, dados coletados em campo (T.Máx/Mín/Referência e o que depende deles),
+  // defeito, recomendação, ação executada, observações e fotos. NÃO salva direto — abre no formulário
+  // como um rascunho novo, para revisão antes de gravar.
+  const handleClone = rel => {
+    const clonarPonto = p => ({
+      ...p,
+      id: Date.now()+Math.random(),
+      dataMedicao: "", horaMedicao: "",
+      tempMax: "", tempMin: "", tempRef: "", tempMedia: "", deltaT: "",
+      severidade: "normal", severidadeAuto: false, cfca: null, criterioSnapshot: null,
+      defeito: "", recomendacao: "", acaoExecutada: "", observacoes: "",
+      fotoTermicaPreview: null, fotoRealPreview: null,
+    });
+    const clone = {
+      ...rel,
+      id: Date.now(),
+      numRelatorio: "",
+      os: "", numArt: "",
+      status: "Rascunho",
+      dataRelatorio: new Date().toISOString().slice(0,10),
+      pontos: (rel.pontos||[]).map(clonarPonto),
+    };
+    setEditRel(clone);
+    setView("form");
+    showToast("Relatório clonado — preencha data, OS/ART e os dados desta nova medição.");
   };
 
   const handleSaveCadastro = (tipo, item) => {
@@ -583,7 +622,7 @@ export default function App() {
       )}
 
       <main style={{maxWidth:1120,margin:"0 auto",padding:"20px 16px 54px"}}>
-        {view==="dash" && <Dashboard data={data} onNew={()=>{setEditRel(null);setView("form");}} onEdit={r=>{setEditRel(r);setView("form");}} onDelete={handleDelete} onCompar={c=>{setComparCli(c);setView("comp");}} onPdf={r=>exportPDF(r,data.relatorios)} onJpg={r=>exportJPG(r,data.relatorios)} />}
+        {view==="dash" && <Dashboard data={data} onNew={()=>{setEditRel(null);setView("form");}} onEdit={r=>{setEditRel(r);setView("form");}} onDelete={handleDelete} onClone={handleClone} onCompar={c=>{setComparCli(c);setView("comp");}} onPdf={r=>exportPDF(r,data.relatorios)} onJpg={r=>exportJPG(r,data.relatorios)} />}
         {view==="form" && <FormRel initial={editRel} onSave={handleSave} onCancel={()=>setView("dash")} cadastros={data.cadastros} relatorios={data.relatorios} />}
         {view==="comp" && <Comparativo cliente={comparCli} relatorios={data.relatorios} onBack={()=>setView("dash")} />}
         {view==="cadastros" && <Cadastros cadastros={data.cadastros} onSave={handleSaveCadastro} onDelete={handleDeleteCadastro} tab={cadTab} setTab={setCadTab}/>}
@@ -1404,18 +1443,11 @@ function CadCriterios({ items, onSave, onDelete }) {
   const grupos = {};
   items.forEach(c=>{ const g=c.grupo||"Outros"; (grupos[g]=grupos[g]||[]).push(c); });
   const nomesGrupo = Object.keys(grupos).sort((a,b)=>a.localeCompare(b,"pt-BR"));
-  return (
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:T.textBright}}>{items.length} critério(s) cadastrado(s)</div>
-        <Btn primary onClick={()=>setForm({...empty,id:Date.now()+""})}>＋ Novo Critério</Btn>
-      </div>
-      <div style={{fontSize:12,color:T.textFaint,marginBottom:16,lineHeight:1.5}}>
-        Cada critério corresponde a um <b>ponto de medição específico</b> (ex.: "Motor Elétrico — Conexões", "Motor Elétrico — Mancais"),
-        não apenas ao tipo de equipamento. O "Grupo" agrupa critérios relacionados no seletor de Tipo da medição.
-      </div>
-      {form && (
-        <div style={{background:T.panel,border:"1px solid "+T.accent,borderRadius:10,padding:20,marginBottom:20}}>
+  // Editando um item existente: o formulário aparece logo abaixo DELE na lista, não lá em cima.
+  // Criando um novo (＋ Novo Critério): não há item para ancorar, então continua aparecendo no topo.
+  const isEditingExisting = !!(form && items.some(i=>i.id===form.id));
+  const formBlock = form && (
+        <div style={{background:T.panel,border:"1px solid "+T.accent,borderRadius:10,padding:20,marginBottom:20,marginTop:isEditingExisting?10:0}}>
           <ST style={{marginBottom:16}}>Dados do Critério</ST>
           <G3 mb={12}>
             <F l="Nome / Ponto de Medição *" v={form.nome||""} s={v=>set("nome",v)} ph="Ex: Motor Elétrico — Conexões Elétricas"/>
@@ -1469,34 +1501,48 @@ function CadCriterios({ items, onSave, onDelete }) {
             <Btn onClick={()=>setForm(null)}>Cancelar</Btn>
           </div>
         </div>
-      )}
+  );
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:T.textBright}}>{items.length} critério(s) cadastrado(s)</div>
+        <Btn primary onClick={()=>setForm({...empty,id:Date.now()+""})}>＋ Novo Critério</Btn>
+      </div>
+      <div style={{fontSize:12,color:T.textFaint,marginBottom:16,lineHeight:1.5}}>
+        Cada critério corresponde a um <b>ponto de medição específico</b> (ex.: "Motor Elétrico — Conexões", "Motor Elétrico — Mancais"),
+        não apenas ao tipo de equipamento. O "Grupo" agrupa critérios relacionados no seletor de Tipo da medição.
+      </div>
+      {!isEditingExisting && formBlock}
       <div style={{display:"flex",flexDirection:"column",gap:18}}>
         {nomesGrupo.map(g=>(
           <div key={g}>
             <div style={{fontSize:11,fontWeight:700,color:T.accent,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>{g}</div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {[...grupos[g]].sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(item=>(
-                <div key={item.id} style={{background:T.panel,border:"1px solid "+T.border,borderRadius:10,padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",opacity:item.ativo===false?.55:1}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
-                      <span style={{fontSize:11,background:T.badgeBlueBg,color:T.blue,padding:"2px 8px",borderRadius:12,fontWeight:700}}>
-                        {(METODOS.find(m=>m.v===item.metodo)||{}).l?.split(" —")[0] || item.metodo}
-                      </span>
-                      {item.ativo===false && <Tag color={T.textFaint}>inativo</Tag>}
-                      {item.statusFonte==="verificado" && <Tag color={T.green}>fonte verificada</Tag>}
+                <div key={item.id}>
+                  <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:10,padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",opacity:item.ativo===false?.55:1}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+                        <span style={{fontSize:11,background:T.badgeBlueBg,color:T.blue,padding:"2px 8px",borderRadius:12,fontWeight:700}}>
+                          {(METODOS.find(m=>m.v===item.metodo)||{}).l?.split(" —")[0] || item.metodo}
+                        </span>
+                        {item.ativo===false && <Tag color={T.textFaint}>inativo</Tag>}
+                        {item.statusFonte==="verificado" && <Tag color={T.green}>fonte verificada</Tag>}
+                      </div>
+                      <div style={{fontWeight:700,color:T.textBright}}>{item.nome}</div>
+                      <div style={{fontSize:12,color:T.textFaint,marginTop:2}}>
+                        {item.metodo==="maa" && `MTA: ${item.mta||"—"}°C`}
+                        {item.metodo==="comparativo" && `Suspeita ≥ ${item.toleranciaAlerta||"—"}°C · Certa ≥ ${item.toleranciaCritico||"—"}°C`}
+                        {item.metodo==="qualitativo" && "Classificação manual"}
+                        {item.fonteNormativa && ` · ${item.fonteNormativa}`}
+                      </div>
                     </div>
-                    <div style={{fontWeight:700,color:T.textBright}}>{item.nome}</div>
-                    <div style={{fontSize:12,color:T.textFaint,marginTop:2}}>
-                      {item.metodo==="maa" && `MTA: ${item.mta||"—"}°C`}
-                      {item.metodo==="comparativo" && `Suspeita ≥ ${item.toleranciaAlerta||"—"}°C · Certa ≥ ${item.toleranciaCritico||"—"}°C`}
-                      {item.metodo==="qualitativo" && "Classificação manual"}
-                      {item.fonteNormativa && ` · ${item.fonteNormativa}`}
+                    <div style={{display:"flex",gap:8}}>
+                      <Btn small onClick={()=>setForm({...empty,...item})}>✏️</Btn>
+                      <Btn small danger onClick={()=>onDelete(item.id)}>🗑️</Btn>
                     </div>
                   </div>
-                  <div style={{display:"flex",gap:8}}>
-                    <Btn small onClick={()=>setForm({...empty,...item})}>✏️</Btn>
-                    <Btn small danger onClick={()=>onDelete(item.id)}>🗑️</Btn>
-                  </div>
+                  {isEditingExisting && form.id===item.id && formBlock}
                 </div>
               ))}
             </div>
@@ -1591,7 +1637,7 @@ function CadTecnicos({ items, onSave, onDelete }) {
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
-function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecnicos:[]}}, onNew, onEdit, onDelete, onCompar, onPdf, onJpg }) {
+function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecnicos:[]}}, onNew, onEdit, onDelete, onClone, onCompar, onPdf, onJpg }) {
   const T = useContext(ThemeContext);
   const [filtro,setFiltro] = useState("todos");
   const [busca,setBusca]   = useState("");
@@ -1712,7 +1758,7 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
           <div style={{overflowY:"auto",maxHeight:390,display:"flex",flexDirection:"column",gap:0,scrollbarWidth:"thin",scrollbarColor:T.borderMuted+" "+T.panel}}>
             {rels.map((r,i)=>(
               <div key={r.id} style={{borderTop:i>0?"1px solid "+T.border:"none",padding:"14px 16px"}}>
-                <CardRel r={r} onEdit={onEdit} onDelete={onDelete} onPdf={onPdf} onJpg={onJpg}/>
+                <CardRel r={r} onEdit={onEdit} onDelete={onDelete} onClone={onClone} onPdf={onPdf} onJpg={onJpg}/>
               </div>
             ))}
           </div>
@@ -1722,7 +1768,7 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
   );
 }
 
-function CardRel({ r, onEdit, onDelete, onPdf, onJpg }) {
+function CardRel({ r, onEdit, onDelete, onClone, onPdf, onJpg }) {
   const T = useContext(ThemeContext);
   const pts=r.pontos||[];
   const maxDt=Math.max(0,...pts.map(p=>parseFloat(p.deltaT)||0));
@@ -1754,6 +1800,7 @@ function CardRel({ r, onEdit, onDelete, onPdf, onJpg }) {
         <Btn onClick={()=>onPdf(r)} style={{borderColor:T.violetBorder,color:T.violet}}>📄 PDF</Btn>
         <Btn onClick={()=>onJpg(r)} style={{borderColor:T.cyanBorder,color:T.cyan}}>🖼️ JPG</Btn>
         <Btn onClick={()=>onEdit(r)} small>✏️ Editar</Btn>
+        <Btn onClick={()=>onClone(r)} small style={{borderColor:T.indigoBorder,color:T.indigo}}>⧉ Clonar</Btn>
         <Btn onClick={()=>onDelete(r.id)} small danger>🗑️</Btn>
       </div>
     </div>
@@ -1781,12 +1828,26 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
   // Qualquer outro campo (observações, defeito, recomendação...) não deve tocar
   // na severidade — evita apagar uma classificação manual do técnico ao editar algo não relacionado.
   const SEVERIDADE_RECALC_FIELDS = ["tempMax","tempMin","tempRef","tempAmb","tipoEquip"];
+  // Fator de carga: calculado automaticamente quando há corrente nominal + ao menos uma fase medida
+  // (usa a MAIOR corrente de fase, não a média — é o cenário mais conservador para avaliação térmica).
+  // Sem essas correntes (equipamentos que não são Subestação/Transformador), o técnico digita manualmente.
+  const FATOR_CARGA_RECALC_FIELDS = ["corrNom","corrR","corrS","corrT"];
   const updPonto = (id,k,v) => setForm(f=>({
     ...f, pontos:(f.pontos||[]).map(p=>{
       if(p.id!==id) return p;
       let u={...p,[k]:v};
       u.tempMedia = calcMedia(u.tempMax,u.tempMin);
       u.deltaT    = calcDelta(u.tempMax,u.tempRef);
+      if (k==="fatorCarga") {
+        // Técnico digitou manualmente — respeita a escolha, não recalcula na próxima edição de corrente.
+        u.fatorCargaAuto = false;
+        return u;
+      }
+      if (FATOR_CARGA_RECALC_FIELDS.includes(k)) {
+        const fc = calcFatorCarga(u);
+        if (fc !== null) { u.fatorCarga = fc; u.fatorCargaAuto = true; }
+        else { u.fatorCargaAuto = false; }
+      }
       if (k==="severidade") {
         // Técnico está classificando manualmente — respeita a escolha, não recalcula.
         u.severidadeAuto = false;
@@ -2043,7 +2104,14 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
         <G3 mb={10}>
           <FS l="Status Operacional *" v={p.statusOperacao} s={v=>onChange("statusOperacao",v)} opts={statusOpts}/>
           <FS l="Tipo de Instalação" v={p.tipoInstalacao} s={v=>onChange("tipoInstalacao",v)} opts={instalOpts}/>
-          <F l="Fator de Carga (%)" t="number" v={p.fatorCarga} s={v=>onChange("fatorCarga",v)} ph="Ex: 75"/>
+          {p.fatorCargaAuto ? (
+            <div>
+              <label>Fator de Carga (%) <span style={{color:T.green,fontWeight:400,textTransform:"none",letterSpacing:0}}>auto</span></label>
+              <input readOnly value={p.fatorCarga} style={{cursor:"default"}}/>
+            </div>
+          ) : (
+            <F l="Fator de Carga (%)" t="number" v={p.fatorCarga} s={v=>onChange("fatorCarga",v)} ph="Ex: 75"/>
+          )}
         </G3>
         {p.statusOperacao==="❌ Fora de operação / desligado" && (
           <div style={{background:T.redSoftBg,border:"1px solid "+T.redSoftBorder,borderRadius:6,padding:"8px 12px",fontSize:12,color:T.redSoftText,marginBottom:10}}>
@@ -2062,6 +2130,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
         {isSubTrf && (
           <div style={{marginTop:10}}>
             <div style={{fontSize:11,fontWeight:700,color:T.amber,marginBottom:8,textTransform:"uppercase",letterSpacing:.8}}>⚡ Correntes (Subestação / Transformador)</div>
+            <div style={{fontSize:11,color:T.textFaint,marginBottom:8}}>Preenchendo I. Nominal + ao menos uma fase, o Fator de Carga acima é calculado automaticamente (maior corrente de fase ÷ nominal).</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10}}>
               <F l="I. Nominal (A)" t="number" v={p.corrNom} s={v=>onChange("corrNom",v)}/>
               <F l="I. Fase R (A)" t="number" v={p.corrR} s={v=>onChange("corrR",v)}/>
