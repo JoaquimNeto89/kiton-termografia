@@ -60,6 +60,52 @@ const LIGHT_THEME = {
 };
 
 const calcSev   = (dt, tipo) => { const d = parseFloat(dt); if (isNaN(d)||d<0) return "normal"; const c = NBR[tipo]||NBR["Outro"]; return d>=c.critico?"critico":d>=c.alerta?"alerta":"normal"; };
+// ─── CFCA (Critério de Classificação de Componentes Aquecidos) ─────────────
+// Razão AC/MAA, onde MAA = MTA - Ta. 5 faixas mapeadas para o badge de 3 níveis do app;
+// o diagnóstico completo de 5 níveis fica preservado em cfca.nivel/cfca.prazo para o snapshot.
+const CFCA_NIVEIS = [
+  { max: 0.3,  nivel: "Normal",                    severidade: "normal",  prazo: "Rotina" },
+  { max: 0.6,  nivel: "Suspeita de Falha",          severidade: "alerta",  prazo: "Observação / nova medição em curto prazo" },
+  { max: 0.9,  nivel: "Falha Provável",             severidade: "alerta",  prazo: "Intervenção programada" },
+  { max: 1.2,  nivel: "Falha Certa",                severidade: "critico", prazo: "Intervenção imediata" },
+  { max: Infinity, nivel: "Falha Iminente",         severidade: "critico", prazo: "Crítico — ação imediata" },
+];
+const classificaCFCA = razao => CFCA_NIVEIS.find(f => razao < f.max) || CFCA_NIVEIS[CFCA_NIVEIS.length-1];
+
+// Calcula severidade + metadados a partir do ponto e do critério cadastrado (já resolvido, não pelo nome).
+// Retorna {severidade, severidadeAuto, cfca} — nunca sobrescreve se o técnico marcou manual (severidadeAuto:false já setado por quem chama).
+function calcSeveridade(ponto, criterio) {
+  const tMax = parseFloat(ponto.tempMax), tAmb = parseFloat(ponto.tempAmb);
+  if (!criterio) {
+    return { severidade: ponto.severidade || "normal", severidadeAuto: false, cfca: null };
+  }
+  if (criterio.metodo === "maa") {
+    const mta = parseFloat(criterio.mta);
+    if (isNaN(tMax) || isNaN(tAmb) || isNaN(mta)) {
+      return { severidade: ponto.severidade || "normal", severidadeAuto: false, cfca: null };
+    }
+    const maa = mta - tAmb;
+    if (maa <= 0) return { severidade: ponto.severidade || "normal", severidadeAuto: false, cfca: null };
+    const ac = tMax - tAmb;
+    const razao = ac / maa;
+    const c = classificaCFCA(razao);
+    return {
+      severidade: c.severidade, severidadeAuto: true,
+      cfca: { razao: razao.toFixed(2), ac: ac.toFixed(1), maa: maa.toFixed(1), mta, nivel: c.nivel, prazo: c.prazo },
+    };
+  }
+  if (criterio.metodo === "comparativo") {
+    const alerta = parseFloat(criterio.toleranciaAlerta), critico = parseFloat(criterio.toleranciaCritico);
+    const dt = parseFloat(ponto.deltaT);
+    if (isNaN(dt) || isNaN(alerta) || isNaN(critico)) {
+      return { severidade: ponto.severidade || "normal", severidadeAuto: false, cfca: null };
+    }
+    const severidade = dt >= critico ? "critico" : dt >= alerta ? "alerta" : "normal";
+    return { severidade, severidadeAuto: true, cfca: null };
+  }
+  // "qualitativo": técnico sempre classifica manualmente
+  return { severidade: ponto.severidade || "normal", severidadeAuto: false, cfca: null };
+}
 const calcMedia = (mx,mn)   => { const a=parseFloat(mx),b=parseFloat(mn); return isNaN(a)||isNaN(b)?"":((a+b)/2).toFixed(1); };
 const calcDelta = (mx,rf)   => { const a=parseFloat(mx),b=parseFloat(rf); return isNaN(a)||isNaN(b)?"":(a-b).toFixed(1); };
 const fmtDate   = d         => d ? new Date(d+"T12:00").toLocaleDateString("pt-BR") : "—";
@@ -85,6 +131,7 @@ const newPonto = () => ({
   fatorCarga: "",
   corrR: "", corrS: "", corrT: "", corrNom: "",
   severidade: "normal",
+  severidadeAuto: false, cfca: null, criterioSnapshot: null,
   defeito: "", recomendacao: "", acaoExecutada: "",
   observacoes: "",
   fotoTermicaPreview: null, fotoRealPreview: null,
@@ -97,20 +144,32 @@ const INITIAL = {
     clientes: [],    // {id, nome, responsavel}
     instrumentos: [], // {id, tipo, fabricante, modelo, serie, tag, calibracao}
     tecnicos: [],    // {id, nome, crea}
+    criterios: [],   // {id, nome, grupo, metodo:"maa"|"comparativo"|"qualitativo", ...}
   }
 };
+// Migração/semente: transforma os 10 tipos fixos antigos (objeto NBR) em critérios método "comparativo",
+// preservando exatamente os valores atuais (nenhum número novo é inventado aqui).
+const seedCriteriosFromNBR = () => Object.entries(NBR).map(([tipo,c]) => ({
+  id: "seed-"+tipo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-"),
+  nome: tipo, grupo: tipo, metodo: "comparativo",
+  oQueComparado: c.ref, condicoes: "",
+  mta: "", toleranciaAlerta: c.alerta, toleranciaCritico: c.critico,
+  documentacaoNecessaria: "",
+  fonteNormativa: "", statusFonte: "interno", ativo: true,
+}));
 const load = () => {
   try {
     const r = localStorage.getItem(SK);
-    if (!r) return INITIAL;
+    if (!r) { const d = {...INITIAL}; d.cadastros = {...INITIAL.cadastros, criterios: seedCriteriosFromNBR()}; return d; }
     const d = JSON.parse(r);
     if (!d.cadastros) d.cadastros = {...INITIAL.cadastros};
     if (!d.cadastros.clientes) d.cadastros.clientes = [];
     if (!d.cadastros.instrumentos) d.cadastros.instrumentos = [];
     if (!d.cadastros.tecnicos) d.cadastros.tecnicos  = [];
+    if (!d.cadastros.criterios) d.cadastros.criterios = seedCriteriosFromNBR();
     if (!d.relatorios) d.relatorios = [];
     return d;
-  } catch { return {...INITIAL}; }
+  } catch { const d={...INITIAL}; d.cadastros={...INITIAL.cadastros, criterios:seedCriteriosFromNBR()}; return d; }
 };
 const save = d => { try { localStorage.setItem(SK,JSON.stringify(d)); } catch {} };
 
@@ -596,9 +655,23 @@ function buildReportHTML(rel, todosRelatorios) {
   const criticos = pontos.filter(p=>p.severidade==="critico").length;
   const alertas  = pontos.filter(p=>p.severidade==="alerta").length;
   const normais  = pontos.filter(p=>p.severidade==="normal").length;
-  // Critérios de aceitação (texto neutro, sem atribuição normativa) só dos tipos de equipamento presentes neste relatório
+  // Critérios de aceitação — lê o critério CONGELADO no momento da medição (p.criterioSnapshot), não o cadastro
+  // atual, para que uma edição futura no cadastro não altere retroativamente relatórios já emitidos.
+  // Relatórios salvos antes deste recurso existir (sem criterioSnapshot) caem no fallback legado (objeto NBR).
   const tiposUsados = [...new Set(pontos.map(p=>p.tipoEquip).filter(Boolean))];
-  const criteriosUsados = tiposUsados.map(t => ({ tipo: t, ...(NBR[t]||NBR["Outro"]) }));
+  const criteriosUsados = tiposUsados.map(t => {
+    const pontoComCriterio = pontos.find(p=>p.tipoEquip===t && p.criterioSnapshot);
+    if (pontoComCriterio) return pontoComCriterio.criterioSnapshot;
+    const legado = NBR[t] || NBR["Outro"];
+    return { nome:t, grupo:t, metodo:"comparativo", oQueComparado:legado.ref, toleranciaAlerta:legado.alerta, toleranciaCritico:legado.critico, mta:"", documentacaoNecessaria:"" };
+  });
+  const metodoLabel = m => m==="maa" ? "MAA/CFCA" : m==="qualitativo" ? "Qualitativo" : "Comparativo";
+  const criterioResumo = c => {
+    if (c.metodo==="maa") return `MTA = ${c.mta||"—"}°C · severidade pela razão (T.máx−T.amb)/MAA`;
+    if (c.metodo==="qualitativo") return c.documentacaoNecessaria ? `Classificação manual · ${c.documentacaoNecessaria}` : "Classificação manual pelo técnico";
+    return (c.toleranciaAlerta!==""&&c.toleranciaAlerta!=null&&c.toleranciaCritico!==""&&c.toleranciaCritico!=null)
+      ? `🟡 Alerta ≥${c.toleranciaAlerta}°C · 🔴 Crítico ≥${c.toleranciaCritico}°C` : "Sem tolerância numérica — classificação manual";
+  };
   // Numeração das seções da pág. 1: Identificação > Instrumentos (se houver) > Critérios (se houver) > Resumo
   const temInstrumentos = (rel.instrumentos||[]).length>0;
   let __secNum = 1;
@@ -688,16 +761,16 @@ function buildReportHTML(rel, todosRelatorios) {
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="background:#1C2633;">
         <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Tipo de Equipamento</th>
-        <th style="padding:8px 10px;color:#fff;text-align:center;font-size:11px;">🟡 Alerta (ΔT ≥)</th>
-        <th style="padding:8px 10px;color:#fff;text-align:center;font-size:11px;">🔴 Crítico (ΔT ≥)</th>
+        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Método</th>
+        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Critério</th>
         <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Referência de Comparação</th>
       </tr></thead>
       <tbody>${criteriosUsados.map((c,ci)=>`
         <tr style="background:${ci%2===0?"#fff":"#f9fafb"};">
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;font-weight:600;">${c.tipo}</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;color:#b45309;font-weight:700;">${c.alerta}°C</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;color:#CD0000;font-weight:700;">${c.critico}°C</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${c.ref}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;font-weight:600;">${c.nome}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${metodoLabel(c.metodo)}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${criterioResumo(c)}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${c.oQueComparado||"—"}</td>
         </tr>`).join("")}
       </tbody>
     </table>
@@ -1119,24 +1192,25 @@ function Cadastros({ cadastros, onSave, onDelete, tab, setTab }) {
         🗂️ Cadastros
       </div>
       <div style={{display:"flex",gap:0,marginBottom:24,borderRadius:10,overflow:"hidden",border:"1px solid "+T.border}}>
-        {[["clientes","👥 Clientes"],["instrumentos","🔧 Instrumentos"],["tecnicos","👷 Técnicos"]].map(([k,l])=>(
+        {[["clientes","👥 Clientes"],["instrumentos","🔧 Instrumentos"],["tecnicos","👷 Técnicos"],["criterios","📐 Critérios"]].map(([k,l])=>(
           <div key={k} onClick={()=>setTab(k)}
             style={{flex:1,padding:"12px 16px",background:tab===k?T.accent:T.panel,cursor:"pointer",
-              borderRight:k!=="tecnicos"?"1px solid "+T.border:"none",
+              borderRight:k!=="criterios"?"1px solid "+T.border:"none",
               display:"flex",alignItems:"center",justifyContent:"center"}}>
             <span style={{fontSize:13,fontWeight:700,color:tab===k?T.white:T.textFaint}}>{l}</span>
           </div>
         ))}
       </div>
-      {tab==="clientes"     && <CadClientes     items={cadastros.clientes||[]}     onSave={i=>onSave("clientes",i)}     onDelete={id=>onDelete("clientes",id)}/>}
+      {tab==="clientes"     && <CadClientes     items={cadastros.clientes||[]}     criterios={cadastros.criterios||[]} onSave={i=>onSave("clientes",i)}     onDelete={id=>onDelete("clientes",id)}/>}
       {tab==="instrumentos" && <CadInstrumentos items={cadastros.instrumentos||[]} onSave={i=>onSave("instrumentos",i)} onDelete={id=>onDelete("instrumentos",id)}/>}
       {tab==="tecnicos"     && <CadTecnicos     items={cadastros.tecnicos||[]}     onSave={i=>onSave("tecnicos",i)}     onDelete={id=>onDelete("tecnicos",id)}/>}
+      {tab==="criterios"    && <CadCriterios    items={cadastros.criterios||[]}    onSave={i=>onSave("criterios",i)}    onDelete={id=>onDelete("criterios",id)}/>}
     </div>
   );
 }
 
 // ─── CADASTRO CLIENTES ───────────────────────────────────────────────────────
-function CadClientes({ items, onSave, onDelete }) {
+function CadClientes({ items, onSave, onDelete, criterios=[] }) {
   const T = useContext(ThemeContext);
   const empty = {id:"",nome:"",cnpj:"",ie:"",responsavel:"",cargo:"",telefone:"",email:"",site:"",cep:"",logradouro:"",numero:"",complemento:"",bairro:"",cidade:"",uf:"",obs:"",equipamentos:[]};
   const [form,setForm] = useState(null);
@@ -1169,7 +1243,7 @@ function CadClientes({ items, onSave, onDelete }) {
           <G3 mb={14}><F l="Complemento" v={form.complemento||""} s={v=>set("complemento",v)} ph="Sala, Bloco..."/><F l="Bairro" v={form.bairro||""} s={v=>set("bairro",v)} ph="Ex: Jardim Canadá"/><div style={{display:"grid",gridTemplateColumns:"1fr 60px",gap:8}}><F l="Cidade" v={form.cidade||""} s={v=>set("cidade",v)} ph="Ex: Maringá"/><F l="UF" v={form.uf||""} s={v=>set("uf",v)} ph="PR"/></div></G3>
           <div style={{marginBottom:14}}><label>Observações</label><textarea rows={2} value={form.obs||""} onChange={e=>set("obs",e.target.value)} placeholder="Informações adicionais..." style={{resize:"vertical"}}/></div>
           <div style={{fontSize:11,fontWeight:700,color:T.accent,textTransform:"uppercase",letterSpacing:.8,marginBottom:10,borderTop:"1px solid "+T.border,paddingTop:14}}>⚙️ Equipamentos deste Cliente</div>
-          <CadEquipamentos items={form.equipamentos||[]} onChange={eqs=>setForm(f=>({...f,equipamentos:eqs}))}/>
+          <CadEquipamentos items={form.equipamentos||[]} criterios={criterios} onChange={eqs=>setForm(f=>({...f,equipamentos:eqs}))}/>
           <div style={{display:"flex",gap:8,marginTop:16}}>
             <Btn success onClick={()=>{if(!form.nome||!form.cnpj){alert("Nome e CNPJ são obrigatórios");return;}if(!form.logradouro||!form.numero){alert("Endereço é obrigatório");return;}onSave(form);setForm(null);}}>✅ Salvar</Btn>
             <Btn onClick={()=>setForm(null)}>Cancelar</Btn>
@@ -1209,7 +1283,7 @@ function CadClientes({ items, onSave, onDelete }) {
   );
 }
 
-function CadEquipamentos({ items, onChange }) {
+function CadEquipamentos({ items, onChange, criterios=[] }) {
   const T = useContext(ThemeContext);
   const emptyEq = () => ({id:Date.now()+"",tag:"",nome:"",tipo:"",periodicidade:"",localizacao:"",codigoArea:""});
   const [form,setForm] = useState(null);
@@ -1222,7 +1296,7 @@ function CadEquipamentos({ items, onChange }) {
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10,marginBottom:10}}>
             <F l="TAG" v={form.tag} s={v=>setF("tag",v)} ph="Ex: QD-01"/>
             <F l="Identificação *" v={form.nome} s={v=>setF("nome",v)} ph="Ex: Quadro Geral"/>
-            <FS l="Tipo" v={form.tipo} s={v=>setF("tipo",v)} opts={TIPOS}/>
+            <TipoSelect l="Tipo" v={form.tipo} s={v=>setF("tipo",v)} criterios={criterios}/>
             <FS l="Periodicidade" v={form.periodicidade} s={v=>setF("periodicidade",v)} opts={periodOpts}/>
             <F l="Localização / Área *" v={form.localizacao} s={v=>setF("localizacao",v)} ph="Ex: Sala Elétrica"/>
             <F l="Nome / Código de Área" v={form.codigoArea} s={v=>setF("codigoArea",v)} ph="Ex: P1, PINTURA"/>
@@ -1255,6 +1329,130 @@ function CadEquipamentos({ items, onChange }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── CADASTRO CRITÉRIOS DE ACEITAÇÃO ────────────────────────────────────────
+const METODOS = [
+  { v: "maa",         l: "MAA / CFCA — cálculo automático (elétrico, precisa de MTA)" },
+  { v: "comparativo", l: "Comparativo — ΔT com tolerância (linha de base ou legado NBR)" },
+  { v: "qualitativo", l: "Qualitativo — sem cálculo, técnico classifica manualmente" },
+];
+const STATUS_FONTE = [
+  { v: "interno",      l: "Interno (ainda não auditado)" },
+  { v: "a_confirmar",  l: "A confirmar" },
+  { v: "verificado",   l: "Verificado / normativo" },
+];
+function CadCriterios({ items, onSave, onDelete }) {
+  const T = useContext(ThemeContext);
+  const empty = { id:"", nome:"", grupo:"", metodo:"comparativo", oQueComparado:"", condicoes:"",
+    mta:"", toleranciaAlerta:"", toleranciaCritico:"", documentacaoNecessaria:"",
+    fonteNormativa:"", statusFonte:"interno", ativo:true };
+  const [form,setForm] = useState(null);
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const grupos = {};
+  items.forEach(c=>{ const g=c.grupo||"Outros"; (grupos[g]=grupos[g]||[]).push(c); });
+  const nomesGrupo = Object.keys(grupos).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:T.textBright}}>{items.length} critério(s) cadastrado(s)</div>
+        <Btn primary onClick={()=>setForm({...empty,id:Date.now()+""})}>＋ Novo Critério</Btn>
+      </div>
+      <div style={{fontSize:12,color:T.textFaint,marginBottom:16,lineHeight:1.5}}>
+        Cada critério corresponde a um <b>ponto de medição específico</b> (ex.: "Motor Elétrico — Conexões", "Motor Elétrico — Mancais"),
+        não apenas ao tipo de equipamento. O "Grupo" agrupa critérios relacionados no seletor de Tipo da medição.
+      </div>
+      {form && (
+        <div style={{background:T.panel,border:"1px solid "+T.accent,borderRadius:10,padding:20,marginBottom:20}}>
+          <ST style={{marginBottom:16}}>Dados do Critério</ST>
+          <G3 mb={12}>
+            <F l="Nome / Ponto de Medição *" v={form.nome||""} s={v=>set("nome",v)} ph="Ex: Motor Elétrico — Conexões Elétricas"/>
+            <F l="Grupo *" v={form.grupo||""} s={v=>set("grupo",v)} ph="Ex: Motor Elétrico"/>
+            <FS l="Método de Avaliação *" v={METODOS.find(m=>m.v===form.metodo)?.l||""} s={l=>set("metodo",(METODOS.find(m=>m.l===l)||{}).v||"comparativo")} opts={METODOS.map(m=>m.l)}/>
+          </G3>
+          {form.metodo==="maa" && (
+            <G3 mb={12}>
+              <F l="MTA — Máxima Temperatura Admissível (°C) *" t="number" v={form.mta||""} s={v=>set("mta",v)} ph="Ex: 90"/>
+              <div style={{gridColumn:"span 2",fontSize:12,color:T.textFaint,alignSelf:"end",paddingBottom:8}}>
+                MAA = MTA − T. ambiente. Severidade calculada pela razão (T.máx − T.amb) / MAA, conforme CFCA (5 faixas → mapeadas para normal/alerta/crítico).
+              </div>
+            </G3>
+          )}
+          {form.metodo==="comparativo" && (
+            <G3 mb={12}>
+              <F l="ΔT Alerta (°C) *" t="number" v={form.toleranciaAlerta||""} s={v=>set("toleranciaAlerta",v)} ph="Ex: 10"/>
+              <F l="ΔT Crítico (°C) *" t="number" v={form.toleranciaCritico||""} s={v=>set("toleranciaCritico",v)} ph="Ex: 20"/>
+              <F l="O que é comparado (referência)" v={form.oQueComparado||""} s={v=>set("oQueComparado",v)} ph="Ex: Fase adjacente / mancal similar / leitura anterior do mesmo ponto"/>
+            </G3>
+          )}
+          {form.metodo==="qualitativo" && (
+            <div style={{marginBottom:14}}>
+              <label>Documentação necessária para classificação manual</label>
+              <textarea rows={2} value={form.documentacaoNecessaria||""} onChange={e=>set("documentacaoNecessaria",e.target.value)}
+                placeholder="Ex: registrar imagem térmica, condição de carga e observação visual do técnico" style={{resize:"vertical"}}/>
+            </div>
+          )}
+          <div style={{marginBottom:14}}>
+            <label>Condições de aplicação</label>
+            <textarea rows={2} value={form.condicoes||""} onChange={e=>set("condicoes",e.target.value)}
+              placeholder="Ex: válido apenas com carga acima de 40%; medir em regime permanente" style={{resize:"vertical"}}/>
+          </div>
+          <G3 mb={0}>
+            <F l="Fonte / Referência Normativa" v={form.fonteNormativa||""} s={v=>set("fonteNormativa",v)} ph="Ex: Petrobras N-2475 / MIL-STD-2194 / critério interno"/>
+            <FS l="Status da Fonte" v={STATUS_FONTE.find(s2=>s2.v===form.statusFonte)?.l||""} s={l=>set("statusFonte",(STATUS_FONTE.find(s2=>s2.l===l)||{}).v||"interno")} opts={STATUS_FONTE.map(s2=>s2.l)}/>
+            <div style={{display:"flex",alignItems:"flex-end",paddingBottom:8}}>
+              <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+                <input type="checkbox" checked={form.ativo!==false} onChange={e=>set("ativo",e.target.checked)}/>
+                <span style={{fontSize:13,color:T.textDim}}>Ativo (aparece no seletor de Tipo)</span>
+              </label>
+            </div>
+          </G3>
+          <div style={{display:"flex",gap:8,marginTop:16}}>
+            <Btn success onClick={()=>{
+              if(!form.nome||!form.grupo){alert("Nome e Grupo são obrigatórios");return;}
+              if(form.metodo==="maa" && !form.mta){alert("Informe o MTA para o método MAA/CFCA");return;}
+              if(form.metodo==="comparativo" && (form.toleranciaAlerta===""||form.toleranciaCritico==="")){alert("Informe as tolerâncias de Alerta e Crítico para o método Comparativo");return;}
+              onSave(form);setForm(null);
+            }}>✅ Salvar</Btn>
+            <Btn onClick={()=>setForm(null)}>Cancelar</Btn>
+          </div>
+        </div>
+      )}
+      <div style={{display:"flex",flexDirection:"column",gap:18}}>
+        {nomesGrupo.map(g=>(
+          <div key={g}>
+            <div style={{fontSize:11,fontWeight:700,color:T.accent,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>{g}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {[...grupos[g]].sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(item=>(
+                <div key={item.id} style={{background:T.panel,border:"1px solid "+T.border,borderRadius:10,padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",opacity:item.ativo===false?.55:1}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+                      <span style={{fontSize:11,background:T.badgeBlueBg,color:T.blue,padding:"2px 8px",borderRadius:12,fontWeight:700}}>
+                        {(METODOS.find(m=>m.v===item.metodo)||{}).l?.split(" —")[0] || item.metodo}
+                      </span>
+                      {item.ativo===false && <Tag color={T.textFaint}>inativo</Tag>}
+                      {item.statusFonte==="verificado" && <Tag color={T.green}>fonte verificada</Tag>}
+                    </div>
+                    <div style={{fontWeight:700,color:T.textBright}}>{item.nome}</div>
+                    <div style={{fontSize:12,color:T.textFaint,marginTop:2}}>
+                      {item.metodo==="maa" && `MTA: ${item.mta||"—"}°C`}
+                      {item.metodo==="comparativo" && `Alerta ≥ ${item.toleranciaAlerta||"—"}°C · Crítico ≥ ${item.toleranciaCritico||"—"}°C`}
+                      {item.metodo==="qualitativo" && "Classificação manual"}
+                      {item.fonteNormativa && ` · ${item.fonteNormativa}`}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <Btn small onClick={()=>setForm({...empty,...item})}>✏️</Btn>
+                    <Btn small danger onClick={()=>onDelete(item.id)}>🗑️</Btn>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1520,17 +1718,31 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
   const addPonto = () => setForm(f=>({...f,pontos:[...f.pontos,newPonto()]}));
   const delPonto = id => setForm(f=>({...f,pontos:f.pontos.filter(p=>p.id!==id)}));
 
+  // Campos cuja alteração dispara o recálculo automático de severidade.
+  // Qualquer outro campo (observações, defeito, recomendação...) não deve tocar
+  // na severidade — evita apagar uma classificação manual do técnico ao editar algo não relacionado.
+  const SEVERIDADE_RECALC_FIELDS = ["tempMax","tempMin","tempRef","tempAmb","tipoEquip"];
   const updPonto = (id,k,v) => setForm(f=>({
     ...f, pontos:(f.pontos||[]).map(p=>{
       if(p.id!==id) return p;
       let u={...p,[k]:v};
-      const tMax = k==="tempMax"?v:u.tempMax;
-      const tMin = k==="tempMin"?v:u.tempMin;
-      const tRef = k==="tempRef"?v:u.tempRef;
-      const tipo = k==="tipoEquip"?v:u.tipoEquip;
-      u.tempMedia  = calcMedia(tMax,tMin);
-      u.deltaT     = calcDelta(tMax,tRef);
-      u.severidade = calcSev(u.deltaT,tipo);
+      u.tempMedia = calcMedia(u.tempMax,u.tempMin);
+      u.deltaT    = calcDelta(u.tempMax,u.tempRef);
+      if (k==="severidade") {
+        // Técnico está classificando manualmente — respeita a escolha, não recalcula.
+        u.severidadeAuto = false;
+        return u;
+      }
+      if (SEVERIDADE_RECALC_FIELDS.includes(k)) {
+        const criterio = (cadastros.criterios||[]).find(c=>c.nome===u.tipoEquip && c.ativo!==false);
+        const r = calcSeveridade(u, criterio);
+        u.severidade = r.severidade;
+        u.severidadeAuto = r.severidadeAuto;
+        u.cfca = r.cfca;
+        // "Congelamento": grava uma cópia do critério usado no momento da medição, para que
+        // edições futuras no cadastro não alterem retroativamente relatórios já salvos.
+        u.criterioSnapshot = criterio ? {...criterio} : null;
+      }
       return u;
     })
   }));
@@ -1635,12 +1847,23 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
               </div>
             </G3>
             <div style={{marginTop:20,background:T.panelInfo,border:"1px solid "+T.borderInfo,borderRadius:8,padding:"14px 16px"}}>
-              <div style={{fontSize:12,fontWeight:700,color:T.blueBorder,marginBottom:10}}>📘 Referência — Critérios Técnicos de ΔT por Tipo de Equipamento</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:6}}>
-                {Object.entries(NBR).map(([eq,c])=>(
-                  <div key={eq} style={{fontSize:11,color:T.textMuted}}><b style={{color:T.gray9ca}}>{eq}:</b> 🟡≥{c.alerta}°C · 🔴≥{c.critico}°C</div>
-                ))}
-              </div>
+              <div style={{fontSize:12,fontWeight:700,color:T.blueBorder,marginBottom:10}}>📘 Referência — Critérios de Aceitação Cadastrados</div>
+              {(cadastros.criterios||[]).filter(c=>c.ativo!==false).length===0 ? (
+                <div style={{fontSize:12,color:T.textFaint}}>Nenhum critério ativo cadastrado. Cadastre em 🗂️ Cadastros → 📐 Critérios.</div>
+              ) : (
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:6}}>
+                  {(cadastros.criterios||[]).filter(c=>c.ativo!==false).map(c=>(
+                    <div key={c.id} style={{fontSize:11,color:T.textMuted}}>
+                      <b style={{color:T.gray9ca}}>{c.nome}:</b>{" "}
+                      {c.metodo==="maa"
+                        ? `MTA ${c.mta||"—"}°C (MAA/CFCA)`
+                        : c.metodo==="qualitativo"
+                        ? "qualitativo (manual)"
+                        : (c.toleranciaAlerta!==""&&c.toleranciaCritico!=="") ? `🟡≥${c.toleranciaAlerta}°C · 🔴≥${c.toleranciaCritico}°C` : "sem tolerância (manual)"}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1687,9 +1910,10 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
 function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome="", cadastros={clientes:[]} }) {
   const T = useContext(ThemeContext);
   const sev  = T.sev[p.severidade]||T.sev.normal;
-  const crit = NBR[p.tipoEquip];
+  const criterios = cadastros.criterios||[];
+  const crit = criterios.find(c=>c.nome===p.tipoEquip) || null;
   const dt   = parseFloat(p.deltaT);
-  const isSubTrf = ["Subestação","Transformador"].includes(p.tipoEquip);
+  const isSubTrf = ["Subestação","Transformador"].includes(p.tipoEquip) || ["Subestação","Transformador"].includes(crit?.grupo);
 
   const cliCad = (cadastros.clientes||[]).find(c=>c.nome===clienteNome);
   const equipsCliente = cliCad?.equipamentos || [];
@@ -1746,7 +1970,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10,marginBottom:12}}>
         <F l="TAG do Equipamento" v={p.tag||""} s={v=>onChange("tag",v)} ph="Ex: TR-01, QD-15"/>
         <F l="Identificação" v={p.equipamento} s={v=>onChange("equipamento",v)} ph="Ex: Quadro Geral"/>
-        <FS l="Tipo de Equipamento" v={p.tipoEquip} s={v=>onChange("tipoEquip",v)} opts={TIPOS}/>
+        <TipoSelect l="Tipo de Equipamento" v={p.tipoEquip} s={v=>onChange("tipoEquip",v)} criterios={criterios}/>
         <FS l="Periodicidade" v={p.periodicidade||""} s={v=>onChange("periodicidade",v)} opts={periodOpts}/>
       </div>
       <G2 mb={12}>
@@ -1815,16 +2039,37 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
         </div>
       </div>
 
-      {/* Info NBR */}
-      {crit && (
+      {/* Info do Critério — varia por método */}
+      {crit ? (
         <div style={{marginBottom:12,background:T.panelInfo,border:"1px solid "+T.borderInfo,borderRadius:6,padding:"8px 12px",fontSize:11,color:T.textMuted}}>
-          <b style={{color:T.blue}}>Critério — {p.tipoEquip}:</b> Ref. = {crit.ref} · 🟡 Alerta ≥{crit.alerta}°C · 🔴 Crítico ≥{crit.critico}°C
+          {crit.metodo==="maa" && (
+            <>
+              <b style={{color:T.blue}}>Critério — {p.tipoEquip} (MAA/CFCA):</b> MTA = {crit.mta||"—"}°C
+              {p.cfca ? ` · MAA = ${p.cfca.maa}°C · Razão AC/MAA = ${p.cfca.razao} · ${p.cfca.nivel} (${p.cfca.prazo})`
+                      : " · preencha T. Máx e T. Ambiente para calcular"}
+            </>
+          )}
+          {crit.metodo==="comparativo" && (
+            (crit.toleranciaAlerta!==""&&crit.toleranciaCritico!=="") ? (
+              <><b style={{color:T.blue}}>Critério — {p.tipoEquip}:</b> {crit.oQueComparado?`Ref. = ${crit.oQueComparado} · `:""}🟡 Alerta ≥{crit.toleranciaAlerta}°C · 🔴 Crítico ≥{crit.toleranciaCritico}°C</>
+            ) : (
+              <><b style={{color:T.amber}}>Critério — {p.tipoEquip}:</b> sem tolerância numérica cadastrada — classifique a severidade manualmente.</>
+            )
+          )}
+          {crit.metodo==="qualitativo" && (
+            <><b style={{color:T.blue}}>Critério — {p.tipoEquip} (qualitativo):</b> classificação manual.{crit.documentacaoNecessaria?` Documentar: ${crit.documentacaoNecessaria}`:""}</>
+          )}
+          {crit.condicoes && <div style={{marginTop:4,color:T.textFaint}}>Condições de aplicação: {crit.condicoes}</div>}
         </div>
-      )}
+      ) : p.tipoEquip ? (
+        <div style={{marginBottom:12,background:T.redSoftBg,border:"1px solid "+T.redSoftBorder,borderRadius:6,padding:"8px 12px",fontSize:11,color:T.redSoftText}}>
+          ⚠️ Nenhum critério cadastrado para "{p.tipoEquip}" — classifique a severidade manualmente.
+        </div>
+      ) : null}
 
       {/* Severidade */}
       <div style={{marginBottom:12}}>
-        <label>Severidade <span style={{color:T.green,fontWeight:400,textTransform:"none",letterSpacing:0}}>auto (editável)</span></label>
+        <label>Severidade <span style={{color:p.severidadeAuto?T.green:T.amber,fontWeight:400,textTransform:"none",letterSpacing:0}}>{p.severidadeAuto?"auto (editável)":"manual"}</span></label>
         <select value={p.severidade} onChange={e=>onChange("severidade",e.target.value)}>
           {Object.entries(T.sev).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
         </select>
@@ -2002,6 +2247,29 @@ function F({l,v,s,t="text",ph,readonly}){
 }
 function FS({l,v,s,opts}){
   return <div><label>{l}</label><select value={v} onChange={e=>s(e.target.value)}><option value="">Selecione...</option>{opts.map(o=><option key={o} value={o}>{o}</option>)}</select></div>;
+}
+// Seletor de Tipo de Equipamento/Ponto de Medição agrupado por "grupo", lendo do cadastro de Critérios
+// (substitui o antigo <FS opts={TIPOS}/> fixo). Só lista critérios ativos.
+function TipoSelect({l,v,s,criterios=[]}){
+  const ativos = criterios.filter(c=>c.ativo!==false);
+  const grupos = {};
+  ativos.forEach(c=>{ const g=c.grupo||"Outros"; (grupos[g]=grupos[g]||[]).push(c); });
+  const nomesGrupo = Object.keys(grupos).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  return (
+    <div>
+      <label>{l}</label>
+      <select value={v} onChange={e=>s(e.target.value)}>
+        <option value="">Selecione...</option>
+        {nomesGrupo.map(g=>(
+          <optgroup key={g} label={g}>
+            {[...grupos[g]].sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR")).map(c=>
+              <option key={c.id} value={c.nome}>{c.nome}</option>
+            )}
+          </optgroup>
+        ))}
+      </select>
+    </div>
+  );
 }
 function Tag({children,color}){
   const T = useContext(ThemeContext);
