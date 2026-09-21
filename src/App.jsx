@@ -457,21 +457,21 @@ export default function App() {
         </div>
       )}
 
-      <main style={{maxWidth:1120,margin:"0 auto",padding:"20px 16px 44px"}}>
+      <main style={{maxWidth:1120,margin:"0 auto",padding:"20px 16px 54px"}}>
         {view==="dash" && <Dashboard data={data} onNew={()=>{setEditRel(null);setView("form");}} onEdit={r=>{setEditRel(r);setView("form");}} onDelete={handleDelete} onCompar={c=>{setComparCli(c);setView("comp");}} onPdf={r=>exportPDF(r,data.relatorios)} onJpg={r=>exportJPG(r,data.relatorios)} />}
         {view==="form" && <FormRel initial={editRel} onSave={handleSave} onCancel={()=>setView("dash")} cadastros={data.cadastros} relatorios={data.relatorios} />}
         {view==="comp" && <Comparativo cliente={comparCli} relatorios={data.relatorios} onBack={()=>setView("dash")} />}
         {view==="cadastros" && <Cadastros cadastros={data.cadastros} onSave={handleSaveCadastro} onDelete={handleDeleteCadastro} tab={cadTab} setTab={setCadTab}/>}
       </main>
 
-      <footer style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"#0f1422",borderTop:"1px solid #374151",padding:"7px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+      <footer style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100,background:"#0f1422",borderTop:"1px solid #374151",padding:"5px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
         <span style={{fontSize:11,color:"#6b7280",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}}
           title={driveMeta.ownerEmail ? `Banco de dados sincronizado com: ${driveMeta.ownerEmail}` : "Nenhuma conta do Drive sincronizada neste dispositivo"}>
           📁 {driveMeta.ownerEmail || "Nenhuma conta sincronizada"}
         </span>
         <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MENSAGEM)}`}
           target="_blank" rel="noopener noreferrer"
-          style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:5,background:"#16a34a",color:"#fff",fontWeight:700,fontSize:11,textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>
+          style={{display:"flex",alignItems:"center",gap:4,padding:"7px 14px",borderRadius:6,background:"#16a34a",color:"#fff",fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>
           🆘 Ajuda
         </a>
       </footer>
