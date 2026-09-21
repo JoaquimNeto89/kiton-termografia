@@ -550,6 +550,16 @@ function buildReportHTML(rel, todosRelatorios) {
   const criticos = pontos.filter(p=>p.severidade==="critico").length;
   const alertas  = pontos.filter(p=>p.severidade==="alerta").length;
   const normais  = pontos.filter(p=>p.severidade==="normal").length;
+  // Critérios de aceitação (NBR 15763) só dos tipos de equipamento presentes neste relatório
+  const tiposUsados = [...new Set(pontos.map(p=>p.tipoEquip).filter(Boolean))];
+  const criteriosUsados = tiposUsados.map(t => ({ tipo: t, ...(NBR[t]||NBR["Outro"]) }));
+  // Numeração das seções da pág. 1: Identificação > Instrumentos (se houver) > Critérios (se houver) > Resumo
+  const temInstrumentos = (rel.instrumentos||[]).length>0;
+  let __secNum = 1;
+  const numIdentificacao = __secNum++;
+  const numInstrumentos = temInstrumentos ? __secNum++ : null;
+  const numCriterios = criteriosUsados.length>0 ? __secNum++ : null;
+  const numResumo = __secNum++;
 
   function header() { return `
   <div style="background:#ffffff;padding:16px 36px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #CD0000;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
@@ -573,6 +583,8 @@ function buildReportHTML(rel, todosRelatorios) {
   // Calcular total de páginas
   const numGruposIndice = Math.ceil(pontos.length / 20) || 1;
   const totalPaginas = 1 + numGruposIndice + (pontos.length * 2) + 1;
+  // Página (absoluta, 1-indexada) onde começa a ficha do ponto i: capa + páginas de índice + fichas anteriores (2 cada) + 1
+  const paginaFichaDoPonto = i => 1 + numGruposIndice + i*2 + 1;
   let paginaAtual = 0;
   function footerPag() {
     paginaAtual++;
@@ -590,7 +602,7 @@ function buildReportHTML(rel, todosRelatorios) {
   const page1 = `
 <div class="page">
   ${header()}
-  ${sec("1. Identificação do Relatório")}
+  ${sec(`${numIdentificacao}. Identificação do Relatório`)}
   <div style="padding:0 36px;">
     <table style="width:100%;border-collapse:collapse;">
       ${infoRow([["Cliente",rel.cliente],["Nº Relatório",rel.numRelatorio||"—"]])}
@@ -599,8 +611,8 @@ function buildReportHTML(rel, todosRelatorios) {
       ${infoRow([["Técnico Responsável",rel.tecnico||"—"],["",""]]) }
     </table>
   </div>
-  ${(rel.instrumentos||[]).length>0?`
-  ${sec("2. Instrumentos de Ensaio Utilizados")}
+  ${temInstrumentos?`
+  ${sec(`${numInstrumentos}. Instrumentos de Ensaio Utilizados`)}
   <div style="padding:0 36px;">
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="background:#1C2633;">
@@ -621,7 +633,27 @@ function buildReportHTML(rel, todosRelatorios) {
       </tbody>
     </table>
   </div>`:""}
-  ${sec((rel.instrumentos||[]).length>0?"3. Resumo dos Resultados":"2. Resumo dos Resultados")}
+  ${criteriosUsados.length>0?`
+  ${sec(`${numCriterios}. Critérios de Aceitação (ABNT NBR 15763)`)}
+  <div style="padding:0 36px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="background:#1C2633;">
+        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Tipo de Equipamento</th>
+        <th style="padding:8px 10px;color:#fff;text-align:center;font-size:11px;">🟡 Alerta (ΔT ≥)</th>
+        <th style="padding:8px 10px;color:#fff;text-align:center;font-size:11px;">🔴 Crítico (ΔT ≥)</th>
+        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Referência de Comparação</th>
+      </tr></thead>
+      <tbody>${criteriosUsados.map((c,ci)=>`
+        <tr style="background:${ci%2===0?"#fff":"#f9fafb"};">
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;font-weight:600;">${c.tipo}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;color:#b45309;font-weight:700;">${c.alerta}°C</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;color:#CD0000;font-weight:700;">${c.critico}°C</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${c.ref}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>`:""}
+  ${sec(`${numResumo}. Resumo dos Resultados`)}
   <div style="padding:0 36px;">
     <table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><tbody><tr>
       <td style="padding:14px;border:1px solid #e5e7eb;text-align:center;background:#f8fafc;"><div style="font-size:26px;font-weight:800;color:#1C2633;">${pontos.length}</div><div style="font-size:11px;color:#6b7280;text-transform:uppercase;">Medições</div></td>
@@ -656,8 +688,9 @@ function buildReportHTML(rel, todosRelatorios) {
         <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Identificação</th>
         <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Tipo</th>
         <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Localização</th>
-        <th style="padding:8px 10px;color:#fff;text-align:center;font-size:11px;">ΔT</th>
+        <th style="padding:8px 10px;color:#fff;text-align:center;font-size:11px;">Tmáx.</th>
         <th style="padding:8px 10px;color:#fff;text-align:center;font-size:11px;">Severidade</th>
+        <th style="padding:8px 10px;color:#fff;text-align:center;font-size:11px;width:36px;">Pág.</th>
       </tr></thead>
       <tbody>${grupo.map((p,li)=>{
         const pi = gi*PONTOS_POR_PAGINA_INDICE + li;
@@ -668,8 +701,9 @@ function buildReportHTML(rel, todosRelatorios) {
           <td style="padding:7px 10px;border:1px solid #e5e7eb;font-weight:600;">${p.equipamento||"—"}</td>
           <td style="padding:7px 10px;border:1px solid #e5e7eb;">${p.tipoEquip||"—"}</td>
           <td style="padding:7px 10px;border:1px solid #e5e7eb;">${p.localizacao||"—"}</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:${sc[p.severidade]||"#16a34a"};">${p.deltaT||"—"}°C</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:${sc[p.severidade]||"#16a34a"};">${p.tempMax||"—"}°C</td>
           <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;"><span style="background:${sb[p.severidade]||"#f0fdf4"};color:${sc[p.severidade]||"#16a34a"};padding:2px 8px;border-radius:10px;font-weight:700;font-size:10px;">${sl[p.severidade]||"🟢 NORMAL"}</span></td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;"><a href="#ficha-${pi}" style="color:#1C2633;text-decoration:underline;">${paginaFichaDoPonto(pi)}</a></td>
         </tr>`;
       }).join("")}
       </tbody>
@@ -698,7 +732,7 @@ function buildReportHTML(rel, todosRelatorios) {
 
     // ── PÁGINA A: Identificação + Dados + Fotos ──────────────────────────────
     const pageA = `
-<div class="page">
+<div class="page" id="ficha-${i}">
   ${header()}
   <div style="padding:14px 36px 0;">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -1688,19 +1722,29 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
         )}
       </div>
 
-      {/* Temperaturas */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:12}}>
-        <F l="T. Máx (°C)" t="number" v={p.tempMax} s={v=>onChange("tempMax",v)}/>
-        <F l="T. Mín (°C)" t="number" v={p.tempMin} s={v=>onChange("tempMin",v)}/>
-        <div>
-          <label>T. Média <span style={{color:"#22c55e",fontWeight:400,textTransform:"none",letterSpacing:0}}>auto</span></label>
-          <input readOnly value={p.tempMedia} style={{cursor:"default"}}/>
+      {/* Temperaturas: dados coletados em campo */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#60a5fa",marginBottom:8,textTransform:"uppercase",letterSpacing:.8}}>📥 Dados Coletados em Campo</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+          <F l="T. Máx (°C)" t="number" v={p.tempMax} s={v=>onChange("tempMax",v)}/>
+          <F l="T. Mín (°C)" t="number" v={p.tempMin} s={v=>onChange("tempMin",v)}/>
+          <F l="T. Referência (°C)" t="number" v={p.tempRef} s={v=>onChange("tempRef",v)} ph={p.tempAmb||"—"}/>
         </div>
-        <F l="T. Referência (°C)" t="number" v={p.tempRef} s={v=>onChange("tempRef",v)} ph={p.tempAmb||"—"}/>
-        <div>
-          <label>ΔT <span style={{color:"#22c55e",fontWeight:400,textTransform:"none",letterSpacing:0}}>auto</span></label>
-          <input readOnly value={p.deltaT} style={{fontWeight:700,cursor:"default",
-            color:!isNaN(dt)&&p.deltaT?(p.severidade==="critico"?"#ef4444":p.severidade==="alerta"?"#f59e0b":"#22c55e"):"#6b7280"}}/>
+      </div>
+
+      {/* Temperaturas: dados calculados automaticamente */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#22c55e",marginBottom:8,textTransform:"uppercase",letterSpacing:.8}}>🧮 Dados Calculados</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+          <div>
+            <label>T. Média <span style={{color:"#22c55e",fontWeight:400,textTransform:"none",letterSpacing:0}}>auto</span></label>
+            <input readOnly value={p.tempMedia} style={{cursor:"default"}}/>
+          </div>
+          <div>
+            <label>ΔT <span style={{color:"#22c55e",fontWeight:400,textTransform:"none",letterSpacing:0}}>auto</span></label>
+            <input readOnly value={p.deltaT} style={{fontWeight:700,cursor:"default",
+              color:!isNaN(dt)&&p.deltaT?(p.severidade==="critico"?"#ef4444":p.severidade==="alerta"?"#f59e0b":"#22c55e"):"#6b7280"}}/>
+          </div>
         </div>
       </div>
 
