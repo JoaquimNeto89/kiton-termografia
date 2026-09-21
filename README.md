@@ -4,7 +4,7 @@ Sistema de gestão de relatórios de termografia industrial da Kiton Engenharia 
 
 ## Como usar
 
-Acesse: https://relatorio.rtk.kitonengenharia.com.br/)
+Acesse: https://relatorio.rtk.kitonengenharia.com.br/
 ## Deploy local
 
 ```bash
