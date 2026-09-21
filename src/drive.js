@@ -63,7 +63,9 @@ async function authedFetch(url, opts = {}) {
   }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Drive API ${res.status}: ${body.slice(0,300)}`);
+    const err = new Error(`Drive API ${res.status}: ${body.slice(0,300)}`);
+    err.status = res.status; // permite ao App.jsx distinguir "conta errada" (404/403) de outros erros
+    throw err;
   }
   return res;
 }
