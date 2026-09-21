@@ -313,6 +313,28 @@ export default function App() {
     }
   };
 
+  // Troca manual de conta do Drive usada neste dispositivo (ex: migrar de uma conta para outra
+  // dedicada). Força a tela de escolha de conta do Google, some com a referência ao arquivo antigo
+  // salva aqui (sem apagar nenhum relatório/cadastro local) e refaz a sincronização já com a conta
+  // nova. Se a troca for cancelada, nada muda: só mexe no estado salvo depois de confirmar o login.
+  const handleTrocarContaDrive = async () => {
+    if (driveSyncing) return;
+    if (!confirm(
+      "Trocar a conta do Google Drive usada neste dispositivo?\n\n"+
+      "Nenhum relatório ou cadastro salvo aqui é apagado. Na próxima tela, escolha a conta Google "+
+      "que este dispositivo deve usar a partir de agora."
+    )) return;
+    try {
+      Drive.forgetAccount();
+      await Drive.requestAccessToken({ forceAccountSelection: true });
+      saveDriveMeta({}); setDriveMeta({}); dirtyRef.current = false;
+      showToast("Conta trocada neste dispositivo. Confirme a sincronização a seguir.");
+      await syncDrive({ silent:false });
+    } catch (err) {
+      showToast("Troca de conta cancelada ou falhou: " + err.message, "erro");
+    }
+  };
+
   // Sincronização automática: tenta buscar/enviar sozinho ao abrir o app e depois de qualquer
   // alteração local, sempre em modo silencioso (nunca decide um conflito real sozinho).
   // Dispositivo que nunca sincronizou aqui (sem fileId salvo) não tem como logar sozinho:
@@ -377,6 +399,11 @@ export default function App() {
               <span style={{position:"absolute",top:-2,right:-2,width:7,height:7,borderRadius:"50%",background:driveDotColor,border:"1px solid #0f1422"}}/>
             </span>
             <span style={{marginLeft:4,display:"inline"}} className="hide-mobile">{driveLabel}</span>
+          </button>
+          <button onClick={handleTrocarContaDrive} disabled={driveSyncing}
+            title="Trocar a conta do Google Drive usada neste dispositivo"
+            style={{padding:"7px 10px",borderRadius:6,border:"1px solid #374151",cursor:driveSyncing?"default":"pointer",fontWeight:700,fontSize:15,fontFamily:"'Barlow',sans-serif",background:"transparent",color:"#4b5563",opacity:driveSyncing?0.7:1}}>
+            ⇄
           </button>
         </nav>
       </header>
