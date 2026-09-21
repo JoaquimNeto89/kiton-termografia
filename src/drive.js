@@ -30,8 +30,11 @@ function isTokenValid() {
   return !!(currentToken && currentToken.expires_at > Date.now() + 30000);
 }
 
-export function requestAccessToken() {
-  if (isTokenValid()) return Promise.resolve(currentToken.access_token);
+// forceAccountSelection:true ignora qualquer token em cache e força o Google a mostrar
+// a tela de escolha de conta, mesmo que já exista uma sessão válida. Usado só na troca
+// manual de conta (ver forgetAccount abaixo); no dia a dia fica sempre false.
+export function requestAccessToken({ forceAccountSelection = false } = {}) {
+  if (!forceAccountSelection && isTokenValid()) return Promise.resolve(currentToken.access_token);
   const client = ensureTokenClient();
   return new Promise((resolve, reject) => {
     client.callback = resp => {
@@ -40,8 +43,14 @@ export function requestAccessToken() {
       resolve(currentToken.access_token);
     };
     client.error_callback = err => reject(new Error(err?.message || "Login com Google cancelado ou falhou."));
-    client.requestAccessToken({ prompt: "" });
+    client.requestAccessToken({ prompt: forceAccountSelection ? "select_account" : "" });
   });
+}
+
+// Descarta o token em memória deste dispositivo (não afeta a sessão do Google em si).
+// Usado antes de forçar a escolha de outra conta.
+export function forgetAccount() {
+  currentToken = null;
 }
 
 async function authedFetch(url, opts = {}) {
@@ -82,7 +91,9 @@ export async function findOrCreateFile() {
 }
 
 export async function getFileMeta(fileId) {
-  const res = await authedFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime,name`);
+  // "owners" identifica de qual conta Google é o arquivo (metadado do próprio Drive,
+  // não exige nenhum escopo OAuth extra além do drive.file já usado no resto do app).
+  const res = await authedFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime,name,owners(emailAddress)`);
   return res.json();
 }
 
