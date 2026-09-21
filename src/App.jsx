@@ -1692,20 +1692,23 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
     return (
 
           <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:10,overflow:"hidden",marginBottom:16}}>
-            <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:.8}}>📊 Resumo por Cliente</span>
-                <span style={{fontSize:11,color:T.textDim}}>{clis.length} cliente(s)</span>
-              </div>
-              <div style={{fontSize:10,color:T.textFaint,marginTop:3,textTransform:"uppercase",letterSpacing:.5}}>🎯 Resultados de Severidade — Último Relatório</div>
+            <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:.8}}>📊 Resumo por Cliente</span>
+              <span style={{fontSize:11,color:T.textDim}}>{clis.length} cliente(s)</span>
             </div>
             <div style={{overflowY:"auto",maxHeight:205,scrollbarWidth:"thin",scrollbarColor:T.borderMuted+" "+T.panel}}>
               <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr style={{background:T.panelDeep,position:"sticky",top:0,zIndex:1}}>
-                  {["Cliente","Qtd. de Relatórios","🟢","🟡","🟠","🔴","🟣"].map(h=>(
-                    <th key={h} style={{padding:"8px 12px",textAlign:h==="Cliente"?"left":"center",fontSize:11,fontWeight:700,color:T.textBright,textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}}>{h}</th>
-                  ))}
-                </tr></thead>
+                <thead>
+                  <tr style={{background:T.panelDeep,position:"sticky",top:0,zIndex:1}}>
+                    <th colSpan={2} style={{height:20}}></th>
+                    <th colSpan={5} style={{padding:"3px 12px",textAlign:"center",fontSize:9,fontWeight:700,color:T.textFaint,textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}}>🎯 Resultados de Severidade — Último Relatório</th>
+                  </tr>
+                  <tr style={{background:T.panelDeep,position:"sticky",top:20,zIndex:1}}>
+                    {["Cliente","Qtd. de Relatórios","🟢","🟡","🟠","🔴","🟣"].map(h=>(
+                      <th key={h} style={{padding:"8px 12px",textAlign:h==="Cliente"?"left":"center",fontSize:11,fontWeight:700,color:T.textBright,textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody>
                   {clis.map(c=>(
                     <tr key={c.nome} onClick={()=>setFiltro(filtro===c.nome?"todos":c.nome)}
