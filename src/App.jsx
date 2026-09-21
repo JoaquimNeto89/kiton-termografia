@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { LOGO_B64 } from "./logo.js";
 import * as Drive from "./drive.js";
-// ─── NBR 15763 ────────────────────────────────────────────────────────────────
+// ─── Critérios técnicos de ΔT por tipo de equipamento ──────────────────────────
+// Origem normativa ainda não auditada/confirmada — não atribuir a uma NBR específica
+// até a matriz ser validada. Ver "Critérios de Aceitação" no relatório (texto neutro).
 const NBR = {
   "Painel Elétrico":        { alerta: 10, critico: 20, ref: "Fase adjacente em mesma carga" },
   "Quadro de Distribuição": { alerta: 10, critico: 20, ref: "Fase adjacente em mesma carga" },
@@ -594,7 +596,7 @@ function buildReportHTML(rel, todosRelatorios) {
   const criticos = pontos.filter(p=>p.severidade==="critico").length;
   const alertas  = pontos.filter(p=>p.severidade==="alerta").length;
   const normais  = pontos.filter(p=>p.severidade==="normal").length;
-  // Critérios de aceitação (NBR 15763) só dos tipos de equipamento presentes neste relatório
+  // Critérios de aceitação (texto neutro, sem atribuição normativa) só dos tipos de equipamento presentes neste relatório
   const tiposUsados = [...new Set(pontos.map(p=>p.tipoEquip).filter(Boolean))];
   const criteriosUsados = tiposUsados.map(t => ({ tipo: t, ...(NBR[t]||NBR["Outro"]) }));
   // Numeração das seções da pág. 1: Identificação > Instrumentos (se houver) > Critérios (se houver) > Resumo
@@ -624,6 +626,9 @@ function buildReportHTML(rel, todosRelatorios) {
 
   function infoRow(pairs) { return `<tr>${pairs.map(([k,v])=>`<td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;background:#f8fafc;width:150px;color:#374151;font-size:12px;">${k}</td><td style="padding:6px 10px;border:1px solid #e5e7eb;font-size:12px;">${v||"—"}</td>`).join("")}</tr>`; }
 
+  // Sub-cabeçalho dentro de uma tabela de infoRow, para separar grupos de campos (ex.: coletado em campo vs. calculado)
+  function subRow(label,bg) { return `<tr><td colspan="4" style="padding:${bg?"7px 10px":"10px 10px 4px"};border:none;background:${bg||"transparent"};font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.6px;">${label}</td></tr>`; }
+
   // Calcular total de páginas
   const numGruposIndice = Math.ceil(pontos.length / 20) || 1;
   const totalPaginas = 1 + numGruposIndice + (pontos.length * 2) + 1;
@@ -652,7 +657,7 @@ function buildReportHTML(rel, todosRelatorios) {
       ${infoRow([["Cliente",rel.cliente],["Nº Relatório",rel.numRelatorio||"—"]])}
       ${infoRow([["Nº OS",rel.os||"—"],["Data do Relatório",fd(rel.dataRelatorio)]])}
       ${infoRow([["Local / Unidade",rel.local||"—"],["Responsável Cliente",rel.responsavel||"—"]])}
-      ${infoRow([["Técnico Responsável",rel.tecnico||"—"],["",""]]) }
+      ${infoRow([["Técnico Responsável",rel.tecnico||"—"],["Nº ART",rel.numArt||"—"]]) }
     </table>
   </div>
   ${temInstrumentos?`
@@ -678,7 +683,7 @@ function buildReportHTML(rel, todosRelatorios) {
     </table>
   </div>`:""}
   ${criteriosUsados.length>0?`
-  ${sec(`${numCriterios}. Critérios de Aceitação (ABNT NBR 15763)`)}
+  ${sec(`${numCriterios}. Critérios de Aceitação`)}
   <div style="padding:0 36px;">
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="background:#1C2633;">
@@ -790,18 +795,26 @@ function buildReportHTML(rel, todosRelatorios) {
   ${sec("Dados da Medição")}
   <div style="padding:0 36px;">
     <table style="width:100%;border-collapse:collapse;">
+      ${subRow("Identificação")}
       ${infoRow([["TAG",p.tag||"—"],["Código de Área",p.codigoArea||"—"]])}
-      ${infoRow([["Temp. Máxima","<b>"+(p.tempMax||"—")+"°C</b>"],["Temp. Mínima",(p.tempMin||"—")+"°C"]])}
-      ${infoRow([["Temp. Média",(p.tempMedia||"—")+"°C"],["Temp. Referência",(p.tempRef||"—")+"°C"]])}
-      <tr>
-        <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;background:#f8fafc;width:150px;color:#374151;font-size:12px;">ΔT</td>
-        <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:800;font-size:16px;color:${scolor};">${p.deltaT||"—"}°C</td>
-        <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;background:#f8fafc;width:150px;color:#374151;font-size:12px;">Severidade</td>
-        <td style="padding:6px 10px;border:1px solid #e5e7eb;"><span style="background:${sbg};color:${scolor};padding:3px 12px;border-radius:12px;font-weight:800;font-size:13px;">${slabel}</span></td>
-      </tr>
+      ${subRow("Condições da Medição")}
       ${infoRow([["Status Operacional",p.statusOperacao||"—"],["Tipo de Instalação",p.tipoInstalacao||"—"]])}
       ${infoRow([["Fator de Carga",p.fatorCarga?(p.fatorCarga+"%"):"—"],["Emissividade ε / Transmissão τ",((p.emissividade||"0.95")+" / "+(p.transmissao||"1.00"))]])}
       ${infoRow([["Temp. Ambiente",p.tempAmb?(p.tempAmb+"°C"):"—"],["Umidade",p.umidade?(p.umidade+"%"):"—"]])}
+      ${subRow("Dados Coletados em Campo")}
+      ${infoRow([["Temp. Máxima","<b>"+(p.tempMax||"—")+"°C</b>"],["Temp. Mínima",(p.tempMin||"—")+"°C"]])}
+      ${infoRow([["Temp. Referência",(p.tempRef||"—")+"°C"],["",""]])}
+      ${subRow("Dados Calculados",'#f0fdf4')}
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;background:#f8fafc;width:150px;color:#374151;font-size:12px;">Temp. Média</td>
+        <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;font-size:12px;">${p.tempMedia||"—"}°C</td>
+        <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;background:#f8fafc;width:150px;color:#374151;font-size:12px;">ΔT</td>
+        <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:800;font-size:16px;color:${scolor};">${p.deltaT||"—"}°C</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;background:#f8fafc;width:150px;color:#374151;font-size:12px;">Severidade</td>
+        <td colspan="3" style="padding:6px 10px;border:1px solid #e5e7eb;"><span style="background:${sbg};color:${scolor};padding:3px 12px;border-radius:12px;font-weight:800;font-size:13px;">${slabel}</span></td>
+      </tr>
     </table>
   </div>
   ${sec("Registros Fotográficos")}
@@ -1496,7 +1509,7 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
   const [step,setStep] = useState(0);
   const numAuto = initial?.numRelatorio || gerarNumRelatorio(relatorios);
   const [form,setForm] = useState(()=>initial||{
-    id:Date.now(), numRelatorio:numAuto, os:"",
+    id:Date.now(), numRelatorio:numAuto, os:"", numArt:"",
     cliente:"", responsavel:"", local:"",
     tecnico:"", instrumentos:[],
     status:"Rascunho", observacoes:"", pontos:[newPonto()],
@@ -1587,7 +1600,7 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
               <F l="Responsável (cliente)" v={form.responsavel||""} s={v=>set("responsavel",v)}/>
               <F l="Local / Unidade" v={form.local||""} s={v=>set("local",v)}/>
             </G3>
-            <G2 mt={14}>
+            <G3 mt={14}>
               <div>
                 <label>Técnico Responsável</label>
                 <select value={form.tecnico||""} onChange={e=>set("tecnico",e.target.value)}>
@@ -1595,6 +1608,7 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
                   {(cadastros.tecnicos||[]).map(t=><option key={t.id} value={`${t.nome}${t.crea?" — CREA-PR "+t.crea:""}`}>{t.nome}{t.crea?" — CREA-PR "+t.crea:""}</option>)}
                 </select>
               </div>
+              <F l="Nº ART" v={form.numArt||""} s={v=>set("numArt",v)} ph="Ex: PR20260000000/0"/>
               <div>
                 <label>Instrumentos Utilizados</label>
                 <div style={{background:T.input,border:"1px solid "+T.border,borderRadius:7,padding:"8px 12px",maxHeight:160,overflowY:"auto"}}>
@@ -1619,9 +1633,9 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
                   }
                 </div>
               </div>
-            </G2>
+            </G3>
             <div style={{marginTop:20,background:T.panelInfo,border:"1px solid "+T.borderInfo,borderRadius:8,padding:"14px 16px"}}>
-              <div style={{fontSize:12,fontWeight:700,color:T.blueBorder,marginBottom:10}}>📘 Referência — Critérios NBR 15763: ΔT por Tipo de Equipamento</div>
+              <div style={{fontSize:12,fontWeight:700,color:T.blueBorder,marginBottom:10}}>📘 Referência — Critérios Técnicos de ΔT por Tipo de Equipamento</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:6}}>
                 {Object.entries(NBR).map(([eq,c])=>(
                   <div key={eq} style={{fontSize:11,color:T.textMuted}}><b style={{color:T.gray9ca}}>{eq}:</b> 🟡≥{c.alerta}°C · 🔴≥{c.critico}°C</div>
@@ -1804,7 +1818,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
       {/* Info NBR */}
       {crit && (
         <div style={{marginBottom:12,background:T.panelInfo,border:"1px solid "+T.borderInfo,borderRadius:6,padding:"8px 12px",fontSize:11,color:T.textMuted}}>
-          <b style={{color:T.blue}}>NBR 15763 — {p.tipoEquip}:</b> Ref. = {crit.ref} · 🟡 Alerta ≥{crit.alerta}°C · 🔴 Crítico ≥{crit.critico}°C
+          <b style={{color:T.blue}}>Critério — {p.tipoEquip}:</b> Ref. = {crit.ref} · 🟡 Alerta ≥{crit.alerta}°C · 🔴 Crítico ≥{crit.critico}°C
         </div>
       )}
 
@@ -1899,7 +1913,7 @@ function Comparativo({ cliente, relatorios, onBack }) {
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,flexWrap:"wrap",gap:12}}>
         <div>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,color:T.textBright}}>📊 Comparativo — {cliente}</div>
-          <div style={{color:T.textFaint,fontSize:13}}>Últimas {rels.length} inspeções · NBR 15763</div>
+          <div style={{color:T.textFaint,fontSize:13}}>Últimas {rels.length} inspeções</div>
         </div>
         <Btn onClick={onBack}>← Voltar</Btn>
       </div>
