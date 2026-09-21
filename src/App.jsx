@@ -33,10 +33,14 @@ const DARK_THEME = {
   amber: "#f59e0b", amberBright: "#fbbf24",
   blue: "#60a5fa", blueBorder: "#3b82f6", blueStrong: "#2563eb",
   violet: "#a78bfa", violetBorder: "#7c3aed", indigo: "#818cf8", indigoBorder: "#6366f1", cyan: "#22d3ee", cyanBorder: "#0891b2",
+  // Escala de severidade de 5 níveis (CFCA: Normal → Suspeita de Falha → Falha Provável → Falha Certa → Falha Iminente).
+  // Cores validadas para contraste (WCAG) contra o fundo do badge e da página nos dois temas — ver nota de implementação.
   sev: {
-    critico: { label: "Crítico", color: "#ef4444", bg: "#3b0a0a", border: "#7f1d1d", icon: "🔴" },
-    alerta:  { label: "Alerta",  color: "#f59e0b", bg: "#2d1f00", border: "#78350f", icon: "🟡" },
-    normal:  { label: "Normal",  color: "#22c55e", bg: "#052e16", border: "#14532d", icon: "🟢" },
+    normal:   { label: "Normal",            color: "#22c55e", bg: "#052e16", border: "#14532d", icon: "🟢" },
+    suspeita: { label: "Suspeita de Falha",  color: "#f59e0b", bg: "#2d1f00", border: "#78350f", icon: "🟡" },
+    provavel: { label: "Falha Provável",     color: "#fb923c", bg: "#431407", border: "#9a3412", icon: "🟠" },
+    certa:    { label: "Falha Certa",        color: "#ef4444", bg: "#3b0a0a", border: "#7f1d1d", icon: "🔴" },
+    iminente: { label: "Falha Iminente",     color: "#e879f9", bg: "#4a044e", border: "#86198f", icon: "🟣" },
   },
 };
 
@@ -53,22 +57,22 @@ const LIGHT_THEME = {
   blue: "#2563eb", blueBorder: "#2563eb", blueStrong: "#2563eb",
   violet: "#7c3aed", violetBorder: "#7c3aed", indigo: "#4f46e5", indigoBorder: "#4f46e5", cyan: "#0e7490", cyanBorder: "#0e7490",
   sev: {
-    critico: { label: "Crítico", color: "#dc2626", bg: "#fef2f2", border: "#fecaca", icon: "🔴" },
-    alerta:  { label: "Alerta",  color: "#b45309", bg: "#fffbeb", border: "#fde68a", icon: "🟡" },
-    normal:  { label: "Normal",  color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", icon: "🟢" },
+    normal:   { label: "Normal",            color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", icon: "🟢" },
+    suspeita: { label: "Suspeita de Falha",  color: "#b45309", bg: "#fffbeb", border: "#fde68a", icon: "🟡" },
+    provavel: { label: "Falha Provável",     color: "#c2410c", bg: "#fff7ed", border: "#fed7aa", icon: "🟠" },
+    certa:    { label: "Falha Certa",        color: "#dc2626", bg: "#fef2f2", border: "#fecaca", icon: "🔴" },
+    iminente: { label: "Falha Iminente",     color: "#a21caf", bg: "#fdf4ff", border: "#f0abfc", icon: "🟣" },
   },
 };
 
-const calcSev   = (dt, tipo) => { const d = parseFloat(dt); if (isNaN(d)||d<0) return "normal"; const c = NBR[tipo]||NBR["Outro"]; return d>=c.critico?"critico":d>=c.alerta?"alerta":"normal"; };
 // ─── CFCA (Critério de Classificação de Componentes Aquecidos) ─────────────
-// Razão AC/MAA, onde MAA = MTA - Ta. 5 faixas mapeadas para o badge de 3 níveis do app;
-// o diagnóstico completo de 5 níveis fica preservado em cfca.nivel/cfca.prazo para o snapshot.
+// Razão AC/MAA, onde MAA = MTA - Ta. As 5 faixas mapeiam 1:1 para os 5 níveis de severidade do app.
 const CFCA_NIVEIS = [
-  { max: 0.3,  nivel: "Normal",                    severidade: "normal",  prazo: "Rotina" },
-  { max: 0.6,  nivel: "Suspeita de Falha",          severidade: "alerta",  prazo: "Observação / nova medição em curto prazo" },
-  { max: 0.9,  nivel: "Falha Provável",             severidade: "alerta",  prazo: "Intervenção programada" },
-  { max: 1.2,  nivel: "Falha Certa",                severidade: "critico", prazo: "Intervenção imediata" },
-  { max: Infinity, nivel: "Falha Iminente",         severidade: "critico", prazo: "Crítico — ação imediata" },
+  { max: 0.3,  nivel: "Normal",             severidade: "normal",   prazo: "Rotina" },
+  { max: 0.6,  nivel: "Suspeita de Falha",  severidade: "suspeita", prazo: "Observação / nova medição em curto prazo" },
+  { max: 0.9,  nivel: "Falha Provável",     severidade: "provavel", prazo: "Intervenção programada" },
+  { max: 1.2,  nivel: "Falha Certa",        severidade: "certa",    prazo: "Intervenção imediata" },
+  { max: Infinity, nivel: "Falha Iminente", severidade: "iminente", prazo: "Crítico — ação imediata" },
 ];
 const classificaCFCA = razao => CFCA_NIVEIS.find(f => razao < f.max) || CFCA_NIVEIS[CFCA_NIVEIS.length-1];
 
@@ -100,7 +104,10 @@ function calcSeveridade(ponto, criterio) {
     if (isNaN(dt) || isNaN(alerta) || isNaN(critico)) {
       return { severidade: ponto.severidade || "normal", severidadeAuto: false, cfca: null };
     }
-    const severidade = dt >= critico ? "critico" : dt >= alerta ? "alerta" : "normal";
+    // Comparativo só tem 2 limiares definidos pelo técnico (alerta/crítico), então resolve
+    // naturalmente em 3 das 5 posições (normal/suspeita/certa). "Provável" e "iminente" ficam
+    // reservados ao método MAA/CFCA, que calcula a razão proporcional — ou a um ajuste manual.
+    const severidade = dt >= critico ? "certa" : dt >= alerta ? "suspeita" : "normal";
     return { severidade, severidadeAuto: true, cfca: null };
   }
   // "qualitativo": técnico sempre classifica manualmente
@@ -157,18 +164,36 @@ const seedCriteriosFromNBR = () => Object.entries(NBR).map(([tipo,c]) => ({
   documentacaoNecessaria: "",
   fonteNormativa: "", statusFonte: "interno", ativo: true,
 }));
+// Migração da severidade de 3 para 5 níveis: dados salvos antes desta versão só conheciam
+// "critico"/"alerta"/"normal". Mapeia para os novos nomes (mesma cor/posição, sem perda de sentido);
+// "provavel" e "iminente" só passam a existir organicamente em novas medições pelo método MAA/CFCA.
+const migraSeveridade5Niveis = relatorios => (relatorios||[]).map(r => ({
+  ...r,
+  pontos: (r.pontos||[]).map(p => {
+    if (p.severidade === "critico") return { ...p, severidade: "certa" };
+    if (p.severidade === "alerta")  return { ...p, severidade: "suspeita" };
+    return p;
+  }),
+}));
+// Normaliza qualquer objeto de dados (localStorage, backup importado, ou payload vindo do Drive) para
+// o formato atual: garante os 4 cadastros, semeia critérios se ausentes, migra severidade para 5 níveis.
+// Usar em TODO ponto de entrada de dados (load, restaurar backup, trazer da nuvem) — não só no load() local.
+const normalizeData = d => {
+  if (!d) d = {...INITIAL};
+  if (!d.cadastros) d.cadastros = {...INITIAL.cadastros};
+  if (!d.cadastros.clientes) d.cadastros.clientes = [];
+  if (!d.cadastros.instrumentos) d.cadastros.instrumentos = [];
+  if (!d.cadastros.tecnicos) d.cadastros.tecnicos  = [];
+  if (!d.cadastros.criterios) d.cadastros.criterios = seedCriteriosFromNBR();
+  if (!d.relatorios) d.relatorios = [];
+  d.relatorios = migraSeveridade5Niveis(d.relatorios);
+  return d;
+};
 const load = () => {
   try {
     const r = localStorage.getItem(SK);
     if (!r) { const d = {...INITIAL}; d.cadastros = {...INITIAL.cadastros, criterios: seedCriteriosFromNBR()}; return d; }
-    const d = JSON.parse(r);
-    if (!d.cadastros) d.cadastros = {...INITIAL.cadastros};
-    if (!d.cadastros.clientes) d.cadastros.clientes = [];
-    if (!d.cadastros.instrumentos) d.cadastros.instrumentos = [];
-    if (!d.cadastros.tecnicos) d.cadastros.tecnicos  = [];
-    if (!d.cadastros.criterios) d.cadastros.criterios = seedCriteriosFromNBR();
-    if (!d.relatorios) d.relatorios = [];
-    return d;
+    return normalizeData(JSON.parse(r));
   } catch { const d={...INITIAL}; d.cadastros={...INITIAL.cadastros, criterios:seedCriteriosFromNBR()}; return d; }
 };
 const save = d => { try { localStorage.setItem(SK,JSON.stringify(d)); } catch {} };
@@ -292,7 +317,7 @@ export default function App() {
         );
         if (!okConfirm) return;
         dirtyRef.current = true;
-        setData(incoming);
+        setData(normalizeData(incoming));
         showToast(`Backup restaurado (${incoming.relatorios.length} relatórios)!`);
       } catch {
         showToast("Erro ao ler o arquivo de backup.","erro");
@@ -347,7 +372,7 @@ export default function App() {
             `Cancelar = enviar os dados deste dispositivo para a nuvem (substitui os de lá).`
           );
           if (usarNuvem) {
-            setData(remoteData);
+            setData(normalizeData(remoteData));
             marcarSincronizado({ lastRemoteModified: remoteModified });
             showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
           } else {
@@ -361,7 +386,7 @@ export default function App() {
           return;
         }
         if (remoteTemDados && !localTemDados) {
-          setData(remoteData);
+          setData(normalizeData(remoteData));
           marcarSincronizado({ lastRemoteModified: remoteModified });
           showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
           setDriveSyncing(false);
@@ -383,7 +408,7 @@ export default function App() {
           );
           if (usarNuvem) {
             const remoteData = await Drive.downloadFile(fileId);
-            setData(remoteData);
+            setData(normalizeData(remoteData));
             marcarSincronizado({ lastRemoteModified: remoteModified });
             showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
             setDriveSyncing(false);
@@ -392,7 +417,7 @@ export default function App() {
         } else {
           // nuvem mudou, mas este dispositivo não tem edição própria pendente: seguro trazer sozinho.
           const remoteData = await Drive.downloadFile(fileId);
-          setData(remoteData);
+          setData(normalizeData(remoteData));
           marcarSincronizado({ lastRemoteModified: remoteModified });
           if (!silent) showToast(`Dados trazidos da nuvem (${remoteData.relatorios.length} relatórios)!`);
           setDriveSyncing(false);
@@ -619,9 +644,17 @@ export default function App() {
 }
 
 // ─── EXPORT PDF ───────────────────────────────────────────────────────────────
-function buildPizzaSVG(criticos,alertas,normais,total) {
+// Paleta de severidade (5 níveis) para o PDF — sempre em fundo claro, validada para contraste.
+const SEV_PDF = [
+  { k:"iminente", l:"Falha Iminente", c:"#a21caf", bg:"#fdf4ff" },
+  { k:"certa",    l:"Falha Certa",    c:"#dc2626", bg:"#fef2f2" },
+  { k:"provavel", l:"Falha Provável", c:"#c2410c", bg:"#fff7ed" },
+  { k:"suspeita", l:"Suspeita de Falha", c:"#b45309", bg:"#fffbeb" },
+  { k:"normal",   l:"Normal",         c:"#16a34a", bg:"#f0fdf4" },
+];
+function buildPizzaSVG(counts,total) {
   if(!total||total===0) return "";
-  const data=[{l:"Crítico",v:criticos,c:"#CD0000"},{l:"Alerta",v:alertas,c:"#f59e0b"},{l:"Normal",v:normais,c:"#16a34a"}].filter(d=>d.v>0);
+  const data=SEV_PDF.map(s=>({l:s.l,v:counts[s.k]||0,c:s.c})).filter(d=>d.v>0);
   const cx=100,cy=100,r=82;
   let svgPaths="";
   if(data.length===1) {
@@ -639,7 +672,7 @@ function buildPizzaSVG(criticos,alertas,normais,total) {
     }).join("");
   }
   const svg='<svg viewBox="0 0 200 200" style="width:180px;height:180px;flex-shrink:0;">'+svgPaths+'<circle cx="'+cx+'" cy="'+cy+'" r="24" fill="#f8fafc"/><text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#111" font-size="18" font-weight="800" font-family="Arial">'+total+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#6b7280" font-size="8" font-family="Arial">TOTAL</text></svg>';
-  const rows=[{l:"Crítico",v:criticos,c:"#CD0000"},{l:"Alerta",v:alertas,c:"#f59e0b"},{l:"Normal",v:normais,c:"#16a34a"}]
+  const rows=SEV_PDF.map(s=>({l:s.l,v:counts[s.k]||0,c:s.c})).filter(s=>s.v>0)
     .map(function(s){return '<div style="display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid #f0f0f0;"><div style="width:16px;height:16px;border-radius:50%;background:'+s.c+';flex-shrink:0;"></div><div style="flex:1;font-size:15px;color:#374151;font-weight:600;">'+s.l+'</div><div style="font-size:22px;font-weight:800;color:'+s.c+';">'+s.v+'</div><div style="font-size:14px;color:#9ca3af;width:44px;text-align:right;">'+Math.round(s.v/total*100)+'%</div></div>';}).join("");
   return '<div style="margin:16px 36px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:20px 28px;display:flex;align-items:center;gap:32px;flex-wrap:wrap;"><div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:-4px;">Distribuição por Severidade</div>'+svg+'<div style="display:flex;flex-direction:column;gap:4px;flex:1;">'+rows+'</div></div>';
 }
@@ -648,13 +681,21 @@ function buildPizzaSVG(criticos,alertas,normais,total) {
 function buildReportHTML(rel, todosRelatorios) {
   const rels3 = [...(todosRelatorios||[])].filter(r=>r.cliente===rel.cliente).sort((a,b)=>new Date(b.dataRelatorio)-new Date(a.dataRelatorio)).slice(0,3);
   const fd = d => d ? new Date(d+"T12:00").toLocaleDateString("pt-BR") : "—";
-  const sc = {critico:"#CD0000",alerta:"#b45309",normal:"#16a34a"};
-  const sb = {critico:"#fef2f2",alerta:"#fffbeb",normal:"#f0fdf4"};
-  const sl = {critico:"🔴 CRÍTICO",alerta:"🟡 ALERTA",normal:"🟢 NORMAL"};
+  const sc = {normal:"#16a34a",suspeita:"#b45309",provavel:"#c2410c",certa:"#dc2626",iminente:"#a21caf"};
+  const sb = {normal:"#f0fdf4",suspeita:"#fffbeb",provavel:"#fff7ed",certa:"#fef2f2",iminente:"#fdf4ff"};
+  const sl = {normal:"🟢 NORMAL",suspeita:"🟡 SUSPEITA",provavel:"🟠 PROVÁVEL",certa:"🔴 CERTA",iminente:"🟣 IMINENTE"};
   const pontos = rel.pontos||[];
-  const criticos = pontos.filter(p=>p.severidade==="critico").length;
-  const alertas  = pontos.filter(p=>p.severidade==="alerta").length;
-  const normais  = pontos.filter(p=>p.severidade==="normal").length;
+  const sevCounts = {
+    normal:   pontos.filter(p=>p.severidade==="normal").length,
+    suspeita: pontos.filter(p=>p.severidade==="suspeita").length,
+    provavel: pontos.filter(p=>p.severidade==="provavel").length,
+    certa:    pontos.filter(p=>p.severidade==="certa").length,
+    iminente: pontos.filter(p=>p.severidade==="iminente").length,
+  };
+  // Mantidos para compatibilidade com o texto de alerta abaixo ("intervenção necessária" = certa+iminente)
+  const criticos = sevCounts.certa + sevCounts.iminente;
+  const alertas  = sevCounts.suspeita + sevCounts.provavel;
+  const normais  = sevCounts.normal;
   // Critérios de aceitação — lê o critério CONGELADO no momento da medição (p.criterioSnapshot), não o cadastro
   // atual, para que uma edição futura no cadastro não altere retroativamente relatórios já emitidos.
   // Relatórios salvos antes deste recurso existir (sem criterioSnapshot) caem no fallback legado (objeto NBR).
@@ -670,7 +711,7 @@ function buildReportHTML(rel, todosRelatorios) {
     if (c.metodo==="maa") return `MTA = ${c.mta||"—"}°C · severidade pela razão (T.máx−T.amb)/MAA`;
     if (c.metodo==="qualitativo") return c.documentacaoNecessaria ? `Classificação manual · ${c.documentacaoNecessaria}` : "Classificação manual pelo técnico";
     return (c.toleranciaAlerta!==""&&c.toleranciaAlerta!=null&&c.toleranciaCritico!==""&&c.toleranciaCritico!=null)
-      ? `🟡 Alerta ≥${c.toleranciaAlerta}°C · 🔴 Crítico ≥${c.toleranciaCritico}°C` : "Sem tolerância numérica — classificação manual";
+      ? `🟡 Suspeita ≥${c.toleranciaAlerta}°C · 🔴 Certa ≥${c.toleranciaCritico}°C` : "Sem tolerância numérica — classificação manual";
   };
   // Numeração das seções da pág. 1: Identificação > Instrumentos (se houver) > Critérios (se houver) > Resumo
   const temInstrumentos = (rel.instrumentos||[]).length>0;
@@ -778,13 +819,12 @@ function buildReportHTML(rel, todosRelatorios) {
   ${sec(`${numResumo}. Resumo dos Resultados`)}
   <div style="padding:0 36px;">
     <table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><tbody><tr>
-      <td style="padding:14px;border:1px solid #e5e7eb;text-align:center;background:#f8fafc;"><div style="font-size:26px;font-weight:800;color:#1C2633;">${pontos.length}</div><div style="font-size:11px;color:#6b7280;text-transform:uppercase;">Medições</div></td>
-      <td style="padding:14px;border:1px solid #e5e7eb;text-align:center;background:#fef2f2;"><div style="font-size:26px;font-weight:800;color:#CD0000;">${criticos}</div><div style="font-size:11px;color:#CD0000;text-transform:uppercase;">🔴 Críticos</div></td>
-      <td style="padding:14px;border:1px solid #e5e7eb;text-align:center;background:#fffbeb;"><div style="font-size:26px;font-weight:800;color:#b45309;">${alertas}</div><div style="font-size:11px;color:#b45309;text-transform:uppercase;">🟡 Alertas</div></td>
-      <td style="padding:14px;border:1px solid #e5e7eb;text-align:center;background:#f0fdf4;"><div style="font-size:26px;font-weight:800;color:#16a34a;">${normais}</div><div style="font-size:11px;color:#16a34a;text-transform:uppercase;">🟢 Normais</div></td>
+      <td style="padding:12px 6px;border:1px solid #e5e7eb;text-align:center;background:#f8fafc;"><div style="font-size:24px;font-weight:800;color:#1C2633;">${pontos.length}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;">Medições</div></td>
+      ${SEV_PDF.slice().reverse().map(s=>`
+      <td style="padding:12px 6px;border:1px solid #e5e7eb;text-align:center;background:${s.bg};"><div style="font-size:24px;font-weight:800;color:${s.c};">${sevCounts[s.k]}</div><div style="font-size:10px;color:${s.c};text-transform:uppercase;">${s.l}</div></td>`).join("")}
     </tr></tbody></table>
   </div>
-  ${buildPizzaSVG(criticos,alertas,normais,pontos.length)}
+  ${buildPizzaSVG(sevCounts,pontos.length)}
   <div style="flex:1;min-height:20px;"></div>
   ${footerPag()}
 </div>`;
@@ -957,10 +997,12 @@ ${footerPag()}
       <td style="padding:7px 10px;border:1px solid #e5e7eb;font-weight:700;">${i===0?"Mais Recente":i+"ª Anterior"}</td>
       <td style="padding:7px 10px;border:1px solid #e5e7eb;">${fd(r.dataRelatorio)}</td>
       <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;">${pts.length}</td>
-      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#CD0000;">${pts.filter(p=>p.severidade==="critico").length}</td>
-      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#b45309;">${pts.filter(p=>p.severidade==="alerta").length}</td>
       <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#16a34a;">${pts.filter(p=>p.severidade==="normal").length}</td>
-      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:${maxDt>=20?"#CD0000":maxDt>=10?"#b45309":"#16a34a"};">${maxDt>0?maxDt.toFixed(1)+"°C":"—"}</td>
+      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#b45309;">${pts.filter(p=>p.severidade==="suspeita").length}</td>
+      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#c2410c;">${pts.filter(p=>p.severidade==="provavel").length}</td>
+      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#dc2626;">${pts.filter(p=>p.severidade==="certa").length}</td>
+      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#a21caf;">${pts.filter(p=>p.severidade==="iminente").length}</td>
+      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:${maxDt>=20?"#dc2626":maxDt>=10?"#b45309":"#16a34a"};">${maxDt>0?maxDt.toFixed(1)+"°C":"—"}</td>
     </tr>`;
   }).join("");
 
@@ -969,8 +1011,11 @@ ${footerPag()}
   ${header()}
   ${sec("Conclusões e Análise de Tendência")}
   <div style="padding:0 36px;">
-    ${criticos>0?`<div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #CD0000;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#CD0000;">⚠️ INTERVENÇÃO NECESSÁRIA</b><br/>Foram identificadas ${criticos} medição(ões) com classificação CRÍTICA. Recomenda-se ação corretiva prioritária.</div>`:""}
-    ${criticos===0&&alertas===0?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #16a34a;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#16a34a;">✅ INSTALAÇÃO EM CONDIÇÕES NORMAIS</b><br/>Nenhuma anomalia crítica identificada. Manter monitoramento conforme periodicidade estabelecida.</div>`:""}
+    ${sevCounts.iminente>0?`<div style="background:#fdf4ff;border:1px solid #f0abfc;border-left:4px solid #a21caf;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#a21caf;">🟣 FALHA IMINENTE — AÇÃO IMEDIATA</b><br/>Foram identificadas ${sevCounts.iminente} medição(ões) em Falha Iminente. Recomenda-se intervenção imediata, antes de qualquer outra prioridade deste relatório.</div>`:""}
+    ${sevCounts.certa>0?`<div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#dc2626;">⚠️ INTERVENÇÃO NECESSÁRIA</b><br/>Foram identificadas ${sevCounts.certa} medição(ões) em Falha Certa. Recomenda-se ação corretiva prioritária.</div>`:""}
+    ${sevCounts.provavel>0?`<div style="background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #c2410c;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#c2410c;">🟠 INTERVENÇÃO PROGRAMADA</b><br/>Foram identificadas ${sevCounts.provavel} medição(ões) em Falha Provável. Recomenda-se programar a intervenção.</div>`:""}
+    ${sevCounts.suspeita>0?`<div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #b45309;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#b45309;">🟡 OBSERVAÇÃO RECOMENDADA</b><br/>Foram identificadas ${sevCounts.suspeita} medição(ões) com suspeita de falha. Recomenda-se nova medição em curto prazo.</div>`:""}
+    ${(sevCounts.iminente+sevCounts.certa+sevCounts.provavel+sevCounts.suspeita)===0?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #16a34a;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#16a34a;">✅ INSTALAÇÃO EM CONDIÇÕES NORMAIS</b><br/>Nenhuma anomalia identificada. Manter monitoramento conforme periodicidade estabelecida.</div>`:""}
   </div>
   ${rels3.length>=2?`
   ${sec("Comparativo — Últimas "+rels3.length+" Inspeções")}
@@ -980,9 +1025,11 @@ ${footerPag()}
         <th style="padding:8px 10px;color:#fff;text-align:left;">Inspeção</th>
         <th style="padding:8px 10px;color:#fff;text-align:left;">Data</th>
         <th style="padding:8px 10px;color:#fff;text-align:center;">Medições</th>
-        <th style="padding:8px 10px;color:#fff;text-align:center;">🔴</th>
-        <th style="padding:8px 10px;color:#fff;text-align:center;">🟡</th>
         <th style="padding:8px 10px;color:#fff;text-align:center;">🟢</th>
+        <th style="padding:8px 10px;color:#fff;text-align:center;">🟡</th>
+        <th style="padding:8px 10px;color:#fff;text-align:center;">🟠</th>
+        <th style="padding:8px 10px;color:#fff;text-align:center;">🔴</th>
+        <th style="padding:8px 10px;color:#fff;text-align:center;">🟣</th>
         <th style="padding:8px 10px;color:#fff;text-align:center;">Maior ΔT</th>
       </tr></thead>
       <tbody>${compRows}</tbody>
@@ -1138,13 +1185,16 @@ function exportJPG(rel, todosRelatorios) {
 }
 
 // ─── PIZZA CHART ──────────────────────────────────────────────────────────────
-function PizzaChart({ criticos, alertas, normais, total }) {
+function PizzaChart({ counts={}, total }) {
   if (!total || total === 0) return null;
-  const data = [
-    { label:"Crítico", val:criticos, color:"#CD0000" },
-    { label:"Alerta",  val:alertas,  color:"#f59e0b" },
-    { label:"Normal",  val:normais,  color:"#22c55e" },
-  ].filter(d=>d.val>0);
+  const SEV5 = [
+    { key:"iminente", label:"Falha Iminente",    color:"#e879f9" },
+    { key:"certa",    label:"Falha Certa",       color:"#ef4444" },
+    { key:"provavel", label:"Falha Provável",    color:"#fb923c" },
+    { key:"suspeita", label:"Suspeita de Falha", color:"#f59e0b" },
+    { key:"normal",   label:"Normal",            color:"#22c55e" },
+  ];
+  const data = SEV5.map(s=>({label:s.label,val:counts[s.key]||0,color:s.color})).filter(d=>d.val>0);
   if (data.length===0) return null;
 
   const cx=80,cy=80,r=70;
@@ -1170,12 +1220,12 @@ function PizzaChart({ criticos, alertas, normais, total }) {
         <text x={cx} y={cy+9} textAnchor="middle" fill="#64748b" fontSize="8" fontFamily="'Barlow',sans-serif">TOTAL</text>
       </svg>
       <div style={{display:"flex",flexDirection:"column",gap:10,flex:1,minWidth:120}}>
-        {[{l:"Crítico",v:criticos,c:"#CD0000"},{l:"Alerta",v:alertas,c:"#f59e0b"},{l:"Normal",v:normais,c:"#22c55e"}].map(s=>(
-          <div key={s.l} style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:11,height:11,borderRadius:"50%",background:s.c,flexShrink:0}}/>
-            <div style={{flex:1,fontSize:13,color:"#94a3b8"}}>{s.l}</div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:s.c}}>{s.v}</div>
-            <div style={{fontSize:12,color:"#4b5563",width:34,textAlign:"right"}}>{total>0?Math.round(s.v/total*100):0}%</div>
+        {SEV5.map(s=>counts[s.key]>0 && (
+          <div key={s.key} style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:11,height:11,borderRadius:"50%",background:s.color,flexShrink:0}}/>
+            <div style={{flex:1,fontSize:13,color:"#94a3b8"}}>{s.label}</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:s.color}}>{counts[s.key]}</div>
+            <div style={{fontSize:12,color:"#4b5563",width:34,textAlign:"right"}}>{total>0?Math.round(counts[s.key]/total*100):0}%</div>
           </div>
         ))}
       </div>
@@ -1299,7 +1349,7 @@ function CadEquipamentos({ items, onChange, criterios=[] }) {
             <TipoSelect l="Tipo" v={form.tipo} s={v=>setF("tipo",v)} criterios={criterios}/>
             <FS l="Periodicidade" v={form.periodicidade} s={v=>setF("periodicidade",v)} opts={periodOpts}/>
             <F l="Localização / Área *" v={form.localizacao} s={v=>setF("localizacao",v)} ph="Ex: Sala Elétrica"/>
-            <F l="Nome / Código de Área" v={form.codigoArea} s={v=>setF("codigoArea",v)} ph="Ex: P1, PINTURA"/>
+            <F l="Nome / Código de Área" v={form.codigoArea} s={v=>setF("codigoArea",v)} ph="Ex: P1, Pintura"/>
           </div>
           <div style={{display:"flex",gap:8}}>
             <Btn success small onClick={()=>{if(!form.nome){alert("Informe a identificação");return;}
@@ -1382,8 +1432,8 @@ function CadCriterios({ items, onSave, onDelete }) {
           )}
           {form.metodo==="comparativo" && (
             <G3 mb={12}>
-              <F l="ΔT Alerta (°C) *" t="number" v={form.toleranciaAlerta||""} s={v=>set("toleranciaAlerta",v)} ph="Ex: 10"/>
-              <F l="ΔT Crítico (°C) *" t="number" v={form.toleranciaCritico||""} s={v=>set("toleranciaCritico",v)} ph="Ex: 20"/>
+              <F l="ΔT Suspeita de Falha (°C) *" t="number" v={form.toleranciaAlerta||""} s={v=>set("toleranciaAlerta",v)} ph="Ex: 10"/>
+              <F l="ΔT Falha Certa (°C) *" t="number" v={form.toleranciaCritico||""} s={v=>set("toleranciaCritico",v)} ph="Ex: 20"/>
               <F l="O que é comparado (referência)" v={form.oQueComparado||""} s={v=>set("oQueComparado",v)} ph="Ex: Fase adjacente / mancal similar / leitura anterior do mesmo ponto"/>
             </G3>
           )}
@@ -1413,7 +1463,7 @@ function CadCriterios({ items, onSave, onDelete }) {
             <Btn success onClick={()=>{
               if(!form.nome||!form.grupo){alert("Nome e Grupo são obrigatórios");return;}
               if(form.metodo==="maa" && !form.mta){alert("Informe o MTA para o método MAA/CFCA");return;}
-              if(form.metodo==="comparativo" && (form.toleranciaAlerta===""||form.toleranciaCritico==="")){alert("Informe as tolerâncias de Alerta e Crítico para o método Comparativo");return;}
+              if(form.metodo==="comparativo" && (form.toleranciaAlerta===""||form.toleranciaCritico==="")){alert("Informe as tolerâncias de Suspeita de Falha e Falha Certa para o método Comparativo");return;}
               onSave(form);setForm(null);
             }}>✅ Salvar</Btn>
             <Btn onClick={()=>setForm(null)}>Cancelar</Btn>
@@ -1438,7 +1488,7 @@ function CadCriterios({ items, onSave, onDelete }) {
                     <div style={{fontWeight:700,color:T.textBright}}>{item.nome}</div>
                     <div style={{fontSize:12,color:T.textFaint,marginTop:2}}>
                       {item.metodo==="maa" && `MTA: ${item.mta||"—"}°C`}
-                      {item.metodo==="comparativo" && `Alerta ≥ ${item.toleranciaAlerta||"—"}°C · Crítico ≥ ${item.toleranciaCritico||"—"}°C`}
+                      {item.metodo==="comparativo" && `Suspeita ≥ ${item.toleranciaAlerta||"—"}°C · Certa ≥ ${item.toleranciaCritico||"—"}°C`}
                       {item.metodo==="qualitativo" && "Classificação manual"}
                       {item.fonteNormativa && ` · ${item.fonteNormativa}`}
                     </div>
@@ -1557,8 +1607,8 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
   const st   = {
     total:    all.length,
     clientes: (data.cadastros?.clientes||[]).length,
-    criticos: all.reduce((s,r)=>s+(r.pontos||[]).filter(p=>p.severidade==="critico").length,0),
-    alertas:  all.reduce((s,r)=>s+(r.pontos||[]).filter(p=>p.severidade==="alerta").length,0),
+    criticos: all.reduce((s,r)=>s+(r.pontos||[]).filter(p=>p.severidade==="certa"||p.severidade==="iminente").length,0),
+    alertas:  all.reduce((s,r)=>s+(r.pontos||[]).filter(p=>p.severidade==="suspeita"||p.severidade==="provavel").length,0),
   };
 
 
@@ -1566,7 +1616,12 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
         const clis = (data.cadastros?.clientes||[]).map(cli=>{
           const rs = (data.relatorios||[]).filter(r=>r.cliente===cli.nome);
           const ps = rs.flatMap(r=>r.pontos||[]);
-          return {nome:cli.nome, total:rs.length, crit:ps.filter(p=>p.severidade==="critico").length, alert:ps.filter(p=>p.severidade==="alerta").length, norm:ps.filter(p=>p.severidade==="normal").length};
+          return {nome:cli.nome, total:rs.length,
+            normal:ps.filter(p=>p.severidade==="normal").length,
+            suspeita:ps.filter(p=>p.severidade==="suspeita").length,
+            provavel:ps.filter(p=>p.severidade==="provavel").length,
+            certa:ps.filter(p=>p.severidade==="certa").length,
+            iminente:ps.filter(p=>p.severidade==="iminente").length};
         }).sort((a,b)=>{
           const aTemRel = a.total>0 ? 0 : 1;
           const bTemRel = b.total>0 ? 0 : 1;
@@ -1584,7 +1639,7 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
             <div style={{overflowY:"auto",maxHeight:205,scrollbarWidth:"thin",scrollbarColor:T.borderMuted+" "+T.panel}}>
               <table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr style={{background:T.panelDeep,position:"sticky",top:0,zIndex:1}}>
-                  {["Cliente","Qtd. de Relatórios","🔴","🟡","🟢"].map(h=>(
+                  {["Cliente","Qtd. de Relatórios","🟢","🟡","🟠","🔴","🟣"].map(h=>(
                     <th key={h} style={{padding:"8px 12px",textAlign:h==="Cliente"?"left":"center",fontSize:11,fontWeight:700,color:T.textBright,textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}}>{h}</th>
                   ))}
                 </tr></thead>
@@ -1594,9 +1649,11 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
                       style={{borderTop:"1px solid "+T.border,cursor:"pointer",background:filtro===c.nome?"rgba(205,0,0,0.08)":"transparent"}}>
                       <td style={{padding:"9px 12px",fontWeight:600,color:filtro===c.nome?T.accent:T.textBright,fontSize:13}}>{c.nome}</td>
                       <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.total>0?T.blue:T.textDim,fontSize:13}}>{c.total}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.crit>0?T.red:T.textDim,fontSize:13}}>{c.crit}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.alert>0?T.amber:T.textDim,fontSize:13}}>{c.alert}</td>
-                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.norm>0?T.green:T.textDim,fontSize:13}}>{c.norm}</td>
+                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.normal>0?T.sev.normal.color:T.textDim,fontSize:13}}>{c.normal}</td>
+                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.suspeita>0?T.sev.suspeita.color:T.textDim,fontSize:13}}>{c.suspeita}</td>
+                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.provavel>0?T.sev.provavel.color:T.textDim,fontSize:13}}>{c.provavel}</td>
+                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.certa>0?T.sev.certa.color:T.textDim,fontSize:13}}>{c.certa}</td>
+                      <td style={{padding:"9px 12px",textAlign:"center",fontWeight:700,color:c.iminente>0?T.sev.iminente.color:T.textDim,fontSize:13}}>{c.iminente}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1684,8 +1741,10 @@ function CardRel({ r, onEdit, onDelete, onPdf, onJpg }) {
         </div>
         <div style={{fontSize:12,color:T.textDim,marginBottom:10}}>{[r.local,r.tecnico].filter(Boolean).join(" · ")||"Sem detalhes"}</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          {["critico","alerta","normal"].map(s=>{
+          {["iminente","certa","provavel","suspeita","normal"].map(s=>{
             const sv=T.sev[s]; const c=pts.filter(p=>p.severidade===s).length;
+            if (c===0 && s!=="normal") return null;
+            if (c===0 && s==="normal" && pts.length>0) return null;
             return <span key={s} style={{fontSize:11,background:sv.bg,color:sv.color,border:"1px solid "+sv.border,padding:"2px 10px",borderRadius:20,fontWeight:700}}>{sv.icon} {c}</span>;
           })}
           {maxDt>0 && <span style={{fontSize:11,color:T.textMuted}}>Maior ΔT: <b style={{color:maxDt>=20?T.red:maxDt>=10?T.amber:T.green}}>{maxDt}°C</b></span>}
@@ -1975,7 +2034,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
       </div>
       <G2 mb={12}>
         <F l="Localização / Área *" v={p.localizacao} s={v=>onChange("localizacao",v)} ph="Ex: Sala Elétrica Principal"/>
-        <F l="Nome / Código de Área" v={p.codigoArea||""} s={v=>onChange("codigoArea",v)} ph="Ex: P1, PINTURA"/>
+        <F l="Nome / Código de Área" v={p.codigoArea||""} s={v=>onChange("codigoArea",v)} ph="Ex: P1, Pintura"/>
       </G2>
 
       {/* Condições operacionais */}
@@ -2034,7 +2093,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
           <div>
             <label>ΔT <span style={{color:T.green,fontWeight:400,textTransform:"none",letterSpacing:0}}>auto</span></label>
             <input readOnly value={p.deltaT} style={{fontWeight:700,cursor:"default",
-              color:!isNaN(dt)&&p.deltaT?(p.severidade==="critico"?T.red:p.severidade==="alerta"?T.amber:T.green):T.textMuted}}/>
+              color:!isNaN(dt)&&p.deltaT?(T.sev[p.severidade]?.color||T.green):T.textMuted}}/>
           </div>
         </div>
       </div>
@@ -2051,7 +2110,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
           )}
           {crit.metodo==="comparativo" && (
             (crit.toleranciaAlerta!==""&&crit.toleranciaCritico!=="") ? (
-              <><b style={{color:T.blue}}>Critério — {p.tipoEquip}:</b> {crit.oQueComparado?`Ref. = ${crit.oQueComparado} · `:""}🟡 Alerta ≥{crit.toleranciaAlerta}°C · 🔴 Crítico ≥{crit.toleranciaCritico}°C</>
+              <><b style={{color:T.blue}}>Critério — {p.tipoEquip}:</b> {crit.oQueComparado?`Ref. = ${crit.oQueComparado} · `:""}🟡 Suspeita ≥{crit.toleranciaAlerta}°C · 🔴 Certa ≥{crit.toleranciaCritico}°C</>
             ) : (
               <><b style={{color:T.amber}}>Critério — {p.tipoEquip}:</b> sem tolerância numérica cadastrada — classifique a severidade manualmente.</>
             )
@@ -2167,7 +2226,7 @@ function Comparativo({ cliente, relatorios, onBack }) {
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
           <thead>
             <tr style={{background:T.panelDeep}}>
-              {["Inspeção","Data","Medições","🔴 Críticos","🟡 Alertas","🟢 Normais","Maior ΔT"].map(h=>(
+              {["Inspeção","Data","Medições","🟢 Normais","🟡 Suspeitas","🟠 Prováveis","🔴 Certas","🟣 Iminentes","Maior ΔT"].map(h=>(
                 <th key={h} style={{padding:"11px 14px",textAlign:"left",fontSize:11,fontWeight:700,color:T.textMuted,letterSpacing:.8,textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr>
@@ -2181,10 +2240,12 @@ function Comparativo({ cliente, relatorios, onBack }) {
                   <td style={tds(T)}><Tag color={i===0?T.accent:undefined}>{i===0?"Mais Recente":`${i+1}ª Anterior`}</Tag></td>
                   <td style={tds(T)}>{fmtDate(r.dataRelatorio)}</td>
                   <td style={{...tds(T),fontWeight:700,color:T.textBright}}>{pts.length}</td>
-                  <td style={{...tds(T),color:T.red,fontWeight:700}}>{pts.filter(p=>p.severidade==="critico").length}</td>
-                  <td style={{...tds(T),color:T.amber,fontWeight:700}}>{pts.filter(p=>p.severidade==="alerta").length}</td>
-                  <td style={{...tds(T),color:T.green,fontWeight:700}}>{pts.filter(p=>p.severidade==="normal").length}</td>
-                  <td style={{...tds(T),fontWeight:700,color:maxDt>=20?T.red:maxDt>=10?T.amber:T.green}}>{maxDt>0?`${maxDt}°C`:"—"}</td>
+                  <td style={{...tds(T),color:T.sev.normal.color,fontWeight:700}}>{pts.filter(p=>p.severidade==="normal").length}</td>
+                  <td style={{...tds(T),color:T.sev.suspeita.color,fontWeight:700}}>{pts.filter(p=>p.severidade==="suspeita").length}</td>
+                  <td style={{...tds(T),color:T.sev.provavel.color,fontWeight:700}}>{pts.filter(p=>p.severidade==="provavel").length}</td>
+                  <td style={{...tds(T),color:T.sev.certa.color,fontWeight:700}}>{pts.filter(p=>p.severidade==="certa").length}</td>
+                  <td style={{...tds(T),color:T.sev.iminente.color,fontWeight:700}}>{pts.filter(p=>p.severidade==="iminente").length}</td>
+                  <td style={{...tds(T),fontWeight:700,color:maxDt>=20?T.sev.certa.color:maxDt>=10?T.sev.suspeita.color:T.sev.normal.color}}>{maxDt>0?`${maxDt}°C`:"—"}</td>
                 </tr>
               );
             })}
