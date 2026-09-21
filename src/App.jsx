@@ -107,6 +107,7 @@ export default function App() {
   const [driveSyncing,setDriveSyncing] = useState(false);
   const [driveMeta,setDriveMeta] = useState(loadDriveMeta);
   const [nowTick,setNowTick] = useState(Date.now());
+  const [showFirstSyncModal,setShowFirstSyncModal] = useState(false);
   const dirtyRef = useRef(false); // true = há mudança local ainda não enviada ao Drive
 
   useEffect(()=>{ save(data); },[data]);
@@ -314,7 +315,13 @@ export default function App() {
 
   // Sincronização automática: tenta buscar/enviar sozinho ao abrir o app e depois de qualquer
   // alteração local, sempre em modo silencioso (nunca decide um conflito real sozinho).
-  useEffect(() => { syncDrive({ silent:true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Dispositivo que nunca sincronizou aqui (sem fileId salvo) não tem como logar sozinho:
+  // o navegador bloqueia popup de login do Google sem um clique do usuário. Nesse caso,
+  // em vez de falhar em silêncio, mostra um aviso central pedindo a autorização.
+  useEffect(() => {
+    if (!loadDriveMeta().fileId) { setShowFirstSyncModal(true); return; }
+    syncDrive({ silent:true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!dirtyRef.current) return;
     const t = setTimeout(() => syncDrive({ silent:true }), 1200);
@@ -367,7 +374,7 @@ export default function App() {
             style={{position:"relative",padding:"7px 14px",borderRadius:6,border:"1px solid #374151",cursor:driveSyncing?"default":"pointer",fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",background:"transparent",color:driveSyncing?"#4b5563":"#94a3b8",whiteSpace:"nowrap",opacity:driveSyncing?0.7:1}}>
             <span style={{position:"relative"}}>
               {driveSyncing ? "⏳" : "🔄"}
-              <span className="hide-desktop" style={{position:"absolute",top:-2,right:-2,width:7,height:7,borderRadius:"50%",background:driveDotColor,border:"1px solid #0f1422"}}/>
+              <span style={{position:"absolute",top:-2,right:-2,width:7,height:7,borderRadius:"50%",background:driveDotColor,border:"1px solid #0f1422"}}/>
             </span>
             <span style={{marginLeft:4,display:"inline"}} className="hide-mobile">{driveLabel}</span>
           </button>
@@ -378,6 +385,27 @@ export default function App() {
         <div style={{position:"fixed",top:70,right:20,zIndex:9999,background:toast.t==="ok"?"#16a34a":toast.t==="erro"?"#dc2626":"#2563eb",
           color:"#fff",padding:"10px 20px",borderRadius:8,fontWeight:600,fontSize:14,boxShadow:"0 8px 32px rgba(0,0,0,.5)"}}>
           {toast.msg}
+        </div>
+      )}
+
+      {showFirstSyncModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.65)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#0f1422",border:"1px solid #374151",borderRadius:10,padding:24,maxWidth:420,width:"100%",boxShadow:"0 12px 40px rgba(0,0,0,.5)"}}>
+            <div style={{fontSize:17,fontWeight:800,marginBottom:8,color:"#f1f5f9",fontFamily:"'Rajdhani',sans-serif"}}>🔄 Sincronizar este dispositivo com o Drive?</div>
+            <div style={{fontSize:13,color:"#94a3b8",marginBottom:20,lineHeight:1.6}}>
+              Este dispositivo ainda não está conectado ao Google Drive. Sincronizando agora, os relatórios e cadastros salvos na nuvem (ou os daqui, você escolhe qual versão vale) ficam disponíveis aqui, e as próximas atualizações passam a acontecer sozinhas.
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setShowFirstSyncModal(false)}
+                style={{padding:"9px 16px",borderRadius:6,border:"1px solid #374151",background:"transparent",color:"#94a3b8",cursor:"pointer",fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif"}}>
+                Agora não
+              </button>
+              <button onClick={()=>{ setShowFirstSyncModal(false); syncDrive({silent:false}); }}
+                style={{padding:"9px 16px",borderRadius:6,border:"none",background:"#CD0000",color:"#fff",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"'Barlow',sans-serif"}}>
+                Sincronizar agora
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
