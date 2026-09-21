@@ -262,17 +262,21 @@ export default function App() {
     setView("dash"); setEditRel(null);
   };
 
-  // Clona um relatório existente (ex.: rotina mensal com os mesmos equipamentos/cliente): mantém os
-  // parâmetros do equipamento e da inspeção (cliente, local, técnico, instrumentos, tipo, localização,
-  // condições ambientais/correntes) e limpa apenas o que é específico da visita: data/hora de cada
-  // medição, nº da OS, nº da ART, dados coletados em campo (T.Máx/Mín/Referência e o que depende deles),
-  // defeito, recomendação, ação executada, observações e fotos. NÃO salva direto — abre no formulário
-  // como um rascunho novo, para revisão antes de gravar.
+  // Clona um relatório existente (ex.: rotina mensal com os mesmos equipamentos/cliente): mantém só o que
+  // é parâmetro fixo do equipamento/instalação (TAG, tipo, localização, periodicidade, tipo de instalação,
+  // emissividade/transmissão, corrente NOMINAL de placa) e limpa tudo que é específico da visita: data/hora
+  // de cada medição, nº da OS, nº da ART, dados coletados em campo (T.Máx/Mín/Referência), condições
+  // ambientais (temperatura, umidade, condição do dia), correntes de fase MEDIDAS, fator de carga, defeito,
+  // recomendação, ação executada, observações e fotos. NÃO salva direto — abre no formulário como um
+  // rascunho novo, para revisão antes de gravar.
   const handleClone = rel => {
     const clonarPonto = p => ({
       ...p,
       id: Date.now()+Math.random(),
       dataMedicao: "", horaMedicao: "",
+      tempAmb: "", umidade: "", condicaoAmb: "",
+      corrR: "", corrS: "", corrT: "",
+      fatorCarga: "", fatorCargaAuto: false,
       tempMax: "", tempMin: "", tempRef: "", tempMedia: "", deltaT: "",
       severidade: "normal", severidadeAuto: false, cfca: null, criterioSnapshot: null,
       defeito: "", recomendacao: "", acaoExecutada: "", observacoes: "",
@@ -1659,9 +1663,19 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
 
 
   const tabelaClientes = (() => {
+        // Qtd. de Relatórios = total histórico do cliente. Já os indicadores de severidade (🟢🟡🟠🔴🟣)
+        // refletem só o ÚLTIMO relatório emitido para aquele cliente — um relatório antigo já resolvido
+        // não deve continuar "pesando" no status atual do ativo. Mesmo critério de "mais recente" usado
+        // na ordenação da lista de relatórios: data do relatório e, em empate, o id (mais recente por último).
         const clis = (data.cadastros?.clientes||[]).map(cli=>{
           const rs = (data.relatorios||[]).filter(r=>r.cliente===cli.nome);
-          const ps = rs.flatMap(r=>r.pontos||[]);
+          const ultimoRel = rs.length ? [...rs].sort((a,b)=>{
+            const d = new Date(b.dataRelatorio)-new Date(a.dataRelatorio);
+            if (d!==0) return d;
+            const ia=parseInt(String(a.id).replace(/[^0-9]/g,"")||0), ib=parseInt(String(b.id).replace(/[^0-9]/g,"")||0);
+            return ib-ia;
+          })[0] : null;
+          const ps = ultimoRel ? (ultimoRel.pontos||[]) : [];
           return {nome:cli.nome, total:rs.length,
             normal:ps.filter(p=>p.severidade==="normal").length,
             suspeita:ps.filter(p=>p.severidade==="suspeita").length,
@@ -1678,9 +1692,12 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
     return (
 
           <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:10,overflow:"hidden",marginBottom:16}}>
-            <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:.8}}>📊 Resumo por Cliente</span>
-              <span style={{fontSize:11,color:T.textDim}}>{clis.length} cliente(s)</span>
+            <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:700,color:T.textMuted,textTransform:"uppercase",letterSpacing:.8}}>📊 Resumo por Cliente</span>
+                <span style={{fontSize:11,color:T.textDim}}>{clis.length} cliente(s)</span>
+              </div>
+              <div style={{fontSize:10,color:T.textFaint,marginTop:3,textTransform:"uppercase",letterSpacing:.5}}>🎯 Resultados de Severidade — Último Relatório</div>
             </div>
             <div style={{overflowY:"auto",maxHeight:205,scrollbarWidth:"thin",scrollbarColor:T.borderMuted+" "+T.panel}}>
               <table style={{width:"100%",borderCollapse:"collapse"}}>
@@ -1799,7 +1816,7 @@ function CardRel({ r, onEdit, onDelete, onClone, onPdf, onJpg }) {
       <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
         <Btn onClick={()=>onPdf(r)} style={{borderColor:T.violetBorder,color:T.violet}}>📄 PDF</Btn>
         <Btn onClick={()=>onJpg(r)} style={{borderColor:T.cyanBorder,color:T.cyan}}>🖼️ JPG</Btn>
-        <Btn onClick={()=>onEdit(r)} small>✏️ Editar</Btn>
+        <Btn onClick={()=>onEdit(r)} small style={{borderColor:T.blueBorder,color:T.blue}}>✏️ Editar</Btn>
         <Btn onClick={()=>onClone(r)} small style={{borderColor:T.indigoBorder,color:T.indigo}}>⧉ Clonar</Btn>
         <Btn onClick={()=>onDelete(r.id)} small danger>🗑️</Btn>
       </div>
@@ -1812,13 +1829,17 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
   const T = useContext(ThemeContext);
   const [step,setStep] = useState(0);
   const numAuto = initial?.numRelatorio || gerarNumRelatorio(relatorios);
-  const [form,setForm] = useState(()=>initial||{
-    id:Date.now(), numRelatorio:numAuto, os:"", numArt:"",
-    cliente:"", responsavel:"", local:"",
-    tecnico:"", instrumentos:[],
-    status:"Rascunho", observacoes:"", pontos:[newPonto()],
-    dataRelatorio: new Date().toISOString().slice(0,10),
-  });
+  // initial pode vir sem numRelatorio (ex.: relatório clonado) — nesse caso também precisa do
+  // próximo número sequencial, não só quando não há "initial" nenhum (Novo Relatório do zero).
+  const [form,setForm] = useState(()=>initial
+    ? {...initial, numRelatorio: initial.numRelatorio || numAuto}
+    : {
+      id:Date.now(), numRelatorio:numAuto, os:"", numArt:"",
+      cliente:"", responsavel:"", local:"",
+      tecnico:"", instrumentos:[],
+      status:"Rascunho", observacoes:"", pontos:[newPonto()],
+      dataRelatorio: new Date().toISOString().slice(0,10),
+    });
 
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const addPonto = () => setForm(f=>({...f,pontos:[...f.pontos,newPonto()]}));
@@ -2101,18 +2122,18 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
       {/* Condições operacionais */}
       <div style={{background:T.panelInfo,border:"1px solid "+T.borderInfo,borderRadius:8,padding:"14px 16px",marginBottom:12}}>
         <div style={{fontSize:11,fontWeight:700,color:T.blue,marginBottom:10,textTransform:"uppercase",letterSpacing:.8}}>🔧 Condições no Momento da Medição</div>
-        <G3 mb={10}>
-          <FS l="Status Operacional *" v={p.statusOperacao} s={v=>onChange("statusOperacao",v)} opts={statusOpts}/>
-          <FS l="Tipo de Instalação" v={p.tipoInstalacao} s={v=>onChange("tipoInstalacao",v)} opts={instalOpts}/>
-          {p.fatorCargaAuto ? (
-            <div>
-              <label>Fator de Carga (%) <span style={{color:T.green,fontWeight:400,textTransform:"none",letterSpacing:0}}>auto</span></label>
-              <input readOnly value={p.fatorCarga} style={{cursor:"default"}}/>
-            </div>
-          ) : (
+        {isSubTrf ? (
+          <G2 mb={10}>
+            <FS l="Status Operacional *" v={p.statusOperacao} s={v=>onChange("statusOperacao",v)} opts={statusOpts}/>
+            <FS l="Tipo de Instalação" v={p.tipoInstalacao} s={v=>onChange("tipoInstalacao",v)} opts={instalOpts}/>
+          </G2>
+        ) : (
+          <G3 mb={10}>
+            <FS l="Status Operacional *" v={p.statusOperacao} s={v=>onChange("statusOperacao",v)} opts={statusOpts}/>
+            <FS l="Tipo de Instalação" v={p.tipoInstalacao} s={v=>onChange("tipoInstalacao",v)} opts={instalOpts}/>
             <F l="Fator de Carga (%)" t="number" v={p.fatorCarga} s={v=>onChange("fatorCarga",v)} ph="Ex: 75"/>
-          )}
-        </G3>
+          </G3>
+        )}
         {p.statusOperacao==="❌ Fora de operação / desligado" && (
           <div style={{background:T.redSoftBg,border:"1px solid "+T.redSoftBorder,borderRadius:6,padding:"8px 12px",fontSize:12,color:T.redSoftText,marginBottom:10}}>
             ⚠️ Equipamento fora de operação — inspeção pode ser inconclusiva conforme NBR 15572
@@ -2130,7 +2151,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
         {isSubTrf && (
           <div style={{marginTop:10}}>
             <div style={{fontSize:11,fontWeight:700,color:T.amber,marginBottom:8,textTransform:"uppercase",letterSpacing:.8}}>⚡ Correntes (Subestação / Transformador)</div>
-            <div style={{fontSize:11,color:T.textFaint,marginBottom:8}}>Preenchendo I. Nominal + ao menos uma fase, o Fator de Carga acima é calculado automaticamente (maior corrente de fase ÷ nominal).</div>
+            <div style={{fontSize:11,color:T.textFaint,marginBottom:8}}>Preenchendo I. Nominal + ao menos uma fase, o Fator de Carga é calculado automaticamente (maior corrente de fase ÷ nominal) e aparece logo abaixo, em "🧮 Dados Calculados".</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10}}>
               <F l="I. Nominal (A)" t="number" v={p.corrNom} s={v=>onChange("corrNom",v)}/>
               <F l="I. Fase R (A)" t="number" v={p.corrR} s={v=>onChange("corrR",v)}/>
@@ -2151,10 +2172,10 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
         </div>
       </div>
 
-      {/* Temperaturas: dados calculados automaticamente */}
+      {/* Temperaturas (e, para Subestação/Transformador, Fator de Carga): dados calculados automaticamente */}
       <div style={{marginBottom:12}}>
         <div style={{fontSize:11,fontWeight:700,color:T.green,marginBottom:8,textTransform:"uppercase",letterSpacing:.8}}>🧮 Dados Calculados</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+        <div style={{display:"grid",gridTemplateColumns:isSubTrf?"repeat(3,1fr)":"repeat(2,1fr)",gap:8}}>
           <div>
             <label>T. Média <span style={{color:T.green,fontWeight:400,textTransform:"none",letterSpacing:0}}>auto</span></label>
             <input readOnly value={p.tempMedia} style={{cursor:"default"}}/>
@@ -2164,6 +2185,14 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
             <input readOnly value={p.deltaT} style={{fontWeight:700,cursor:"default",
               color:!isNaN(dt)&&p.deltaT?(T.sev[p.severidade]?.color||T.green):T.textMuted}}/>
           </div>
+          {isSubTrf && (p.fatorCargaAuto ? (
+            <div>
+              <label>Fator de Carga (%) <span style={{color:T.green,fontWeight:400,textTransform:"none",letterSpacing:0}}>auto</span></label>
+              <input readOnly value={p.fatorCarga} style={{cursor:"default"}}/>
+            </div>
+          ) : (
+            <F l="Fator de Carga (%)" t="number" v={p.fatorCarga} s={v=>onChange("fatorCarga",v)} ph="Preencha as correntes ao lado"/>
+          ))}
         </div>
       </div>
 
