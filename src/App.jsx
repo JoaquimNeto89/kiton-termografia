@@ -790,6 +790,15 @@ const SEV_PDF = [
   { k:"suspeita", l:"Alarme",  c:"#d97706", bg:"#fffbeb" },
   { k:"normal",   l:"Normal",  c:"#16a34a", bg:"#f0fdf4" },
 ];
+// Diagnóstico curto entre parênteses, usado só ao lado do Nível no gráfico "Distribuição por Severidade" —
+// mais compacto que o texto combinado (Prioridade) da Legenda de Classificação.
+const DIAGNOSTICO_CURTO = {
+  iminente: "Falha iminente",
+  certa: "Falha potencial",
+  provavel: "Falha provável",
+  suspeita: "Suspeita de falha",
+  normal: "Sem ressalvas",
+};
 function buildPizzaSVG(counts,total) {
   if(!total||total===0) return "";
   const data=SEV_PDF.map(s=>({l:s.l,v:counts[s.k]||0,c:s.c})).filter(d=>d.v>0);
@@ -809,10 +818,10 @@ function buildPizzaSVG(counts,total) {
       return '<path d="M'+cx+','+cy+' L'+x1+','+y1+' A'+r+','+r+' 0 '+large+',1 '+x2+','+y2+' Z" fill="'+d.c+'" stroke="#fff" stroke-width="2"/>';
     }).join("");
   }
-  const svg='<svg viewBox="0 0 200 200" style="width:132px;height:132px;flex-shrink:0;">'+svgPaths+'<circle cx="'+cx+'" cy="'+cy+'" r="24" fill="#f8fafc"/><text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#111" font-size="18" font-weight="800" font-family="Arial">'+total+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#6b7280" font-size="8" font-family="Arial">TOTAL</text></svg>';
-  const rows=SEV_PDF.map(s=>({l:s.l,v:counts[s.k]||0,c:s.c})).filter(s=>s.v>0)
-    .map(function(s){return '<div style="display:flex;align-items:center;gap:10px;padding:4px 0;border-bottom:1px solid #f0f0f0;"><div style="width:13px;height:13px;border-radius:50%;background:'+s.c+';flex-shrink:0;"></div><div style="flex:1;font-size:13px;color:#374151;font-weight:600;">'+s.l+'</div><div style="font-size:17px;font-weight:800;color:'+s.c+';">'+s.v+'</div><div style="font-size:12px;color:#9ca3af;width:38px;text-align:right;">'+Math.round(s.v/total*100)+'%</div></div>';}).join("");
-  return '<div style="margin:12px 36px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:14px 24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;"><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:-2px;">Distribuição por Severidade</div>'+svg+'<div style="display:flex;flex-direction:column;gap:2px;flex:1;">'+rows+'</div></div>';
+  const svg='<svg viewBox="0 0 200 200" style="width:110px;height:110px;flex-shrink:0;">'+svgPaths+'<circle cx="'+cx+'" cy="'+cy+'" r="24" fill="#f8fafc"/><text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#111" font-size="18" font-weight="800" font-family="Arial">'+total+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#6b7280" font-size="8" font-family="Arial">TOTAL</text></svg>';
+  const rows=SEV_PDF.map(s=>({l:s.l,v:counts[s.k]||0,c:s.c,diag:DIAGNOSTICO_CURTO[s.k]})).filter(s=>s.v>0)
+    .map(function(s){return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #f0f0f0;"><div style="width:11px;height:11px;border-radius:50%;background:'+s.c+';flex-shrink:0;"></div><div style="flex:1;font-size:12px;color:#374151;font-weight:600;white-space:nowrap;">'+s.l+' <span style="font-weight:400;color:#9ca3af;">('+s.diag+')</span></div><div style="font-size:15px;font-weight:800;color:'+s.c+';">'+s.v+'</div><div style="font-size:11px;color:#9ca3af;width:34px;text-align:right;">'+Math.round(s.v/total*100)+'%</div></div>';}).join("");
+  return '<div style="margin:8px 36px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:10px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;"><div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:-2px;">Distribuição por Severidade</div>'+svg+'<div style="display:flex;flex-direction:column;gap:1px;flex:1;">'+rows+'</div></div>';
 }
 
 // Legenda de classificação: nível de severidade → prioridade/ação recomendada → descrição, em linguagem
@@ -887,9 +896,9 @@ function buildLegendaSiglas() {
 function buildReportHTML(rel, todosRelatorios) {
   const rels3 = [...(todosRelatorios||[])].filter(r=>r.cliente===rel.cliente).sort((a,b)=>new Date(b.dataRelatorio)-new Date(a.dataRelatorio)).slice(0,3);
   const fd = d => d ? new Date(d+"T12:00").toLocaleDateString("pt-BR") : "—";
-  const sc = {normal:"#16a34a",suspeita:"#b45309",provavel:"#c2410c",certa:"#dc2626",iminente:"#a21caf"};
+  const sc = {normal:"#16a34a",suspeita:"#d97706",provavel:"#ea580c",certa:"#dc2626",iminente:"#c026d3"};
   const sb = {normal:"#f0fdf4",suspeita:"#fffbeb",provavel:"#fff7ed",certa:"#fef2f2",iminente:"#fdf4ff"};
-  const sl = {normal:"🟢 NORMAL",suspeita:"🟡 SUSPEITA",provavel:"🟠 PROVÁVEL",certa:"🔴 CERTA",iminente:"🟣 IMINENTE"};
+  const sl = {normal:"🟢 NORMAL",suspeita:"🟡 ALARME",provavel:"🟠 ATENÇÃO",certa:"🔴 URGENTE",iminente:"🟣 CRÍTICO"};
   const pontos = rel.pontos||[];
   const sevCounts = {
     normal:   pontos.filter(p=>p.severidade==="normal").length,
@@ -955,7 +964,7 @@ function buildReportHTML(rel, todosRelatorios) {
 
   function footer() { return footerPag(); }
 
-  function sec(titulo) { return `<div style="font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;color:#1C2633;margin:20px 36px 8px;padding-bottom:4px;border-bottom:2px solid #CD0000;text-transform:uppercase;letter-spacing:.8px;">${titulo}</div>`; }
+  function sec(titulo) { return `<div style="font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;color:#1C2633;margin:12px 36px 6px;padding-bottom:4px;border-bottom:2px solid #CD0000;text-transform:uppercase;letter-spacing:.8px;">${titulo}</div>`; }
 
   function infoRow(pairs) { return `<tr>${pairs.map(([k,v])=>`<td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;background:#f8fafc;width:150px;color:#374151;font-size:12px;">${k}</td><td style="padding:6px 10px;border:1px solid #e5e7eb;font-size:12px;">${v||"—"}</td>`).join("")}</tr>`; }
 
@@ -1001,21 +1010,21 @@ function buildReportHTML(rel, todosRelatorios) {
   ${temInstrumentos?`
   ${sec(`${numInstrumentos}. Instrumentos de Ensaio Utilizados`)}
   <div style="padding:0 36px;">
-    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
       <thead><tr style="background:#1C2633;">
-        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Tipo</th>
-        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Fabricante / Modelo</th>
-        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Nº de Série</th>
-        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">TAG</th>
-        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Calibração</th>
+        <th style="padding:5px 10px;color:#fff;text-align:left;font-size:10px;">Tipo</th>
+        <th style="padding:5px 10px;color:#fff;text-align:left;font-size:10px;">Fabricante / Modelo</th>
+        <th style="padding:5px 10px;color:#fff;text-align:left;font-size:10px;">Nº de Série</th>
+        <th style="padding:5px 10px;color:#fff;text-align:left;font-size:10px;">TAG</th>
+        <th style="padding:5px 10px;color:#fff;text-align:left;font-size:10px;">Calibração</th>
       </tr></thead>
       <tbody>${(rel.instrumentos||[]).map((inst,ii)=>`
         <tr style="background:${ii%2===0?"#fff":"#f9fafb"};">
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${inst.tipo||"—"}</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;font-weight:600;">${inst.fabricante||""} ${inst.modelo||""}</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${inst.serie||"—"}</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${inst.tag||"—"}</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${inst.calibracao?fd(inst.calibracao):"—"}</td>
+          <td style="padding:4px 10px;border:1px solid #e5e7eb;">${inst.tipo||"—"}</td>
+          <td style="padding:4px 10px;border:1px solid #e5e7eb;font-weight:600;">${inst.fabricante||""} ${inst.modelo||""}</td>
+          <td style="padding:4px 10px;border:1px solid #e5e7eb;">${inst.serie||"—"}</td>
+          <td style="padding:4px 10px;border:1px solid #e5e7eb;">${inst.tag||"—"}</td>
+          <td style="padding:4px 10px;border:1px solid #e5e7eb;">${inst.calibracao?fd(inst.calibracao):"—"}</td>
         </tr>`).join("")}
       </tbody>
     </table>
@@ -1023,29 +1032,29 @@ function buildReportHTML(rel, todosRelatorios) {
   ${criteriosUsados.length>0?`
   ${sec(`${numCriterios}. Critérios de Aceitação`)}
   <div style="padding:0 36px;">
-    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
       <thead><tr style="background:#1C2633;">
-        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Tipo de Equipamento</th>
-        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Método</th>
-        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Critério</th>
-        <th style="padding:8px 10px;color:#fff;text-align:left;font-size:11px;">Referência de Comparação</th>
+        <th style="padding:5px 10px;color:#fff;text-align:left;font-size:10px;">Tipo de Equipamento</th>
+        <th style="padding:5px 10px;color:#fff;text-align:left;font-size:10px;">Método</th>
+        <th style="padding:5px 10px;color:#fff;text-align:left;font-size:10px;">Critério</th>
+        <th style="padding:5px 10px;color:#fff;text-align:left;font-size:10px;">Referência de Comparação</th>
       </tr></thead>
       <tbody>${criteriosUsados.map((c,ci)=>`
         <tr style="background:${ci%2===0?"#fff":"#f9fafb"};">
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;font-weight:600;">${c.nome}</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${metodoLabel(c.metodo)}</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${criterioResumo(c)}</td>
-          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${c.oQueComparado||"—"}</td>
+          <td style="padding:4px 10px;border:1px solid #e5e7eb;font-weight:600;">${c.nome}</td>
+          <td style="padding:4px 10px;border:1px solid #e5e7eb;">${metodoLabel(c.metodo)}</td>
+          <td style="padding:4px 10px;border:1px solid #e5e7eb;">${criterioResumo(c)}</td>
+          <td style="padding:4px 10px;border:1px solid #e5e7eb;">${c.oQueComparado||"—"}</td>
         </tr>`).join("")}
       </tbody>
     </table>
   </div>`:""}
   ${sec(`${numResumo}. Resumo dos Resultados`)}
   <div style="padding:0 36px;">
-    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><tbody><tr>
-      <td style="padding:12px 6px;border:1px solid #e5e7eb;text-align:center;background:#f8fafc;"><div style="font-size:24px;font-weight:800;color:#1C2633;">${pontos.length}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;">Medições</div></td>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:10px;"><tbody><tr>
+      <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:center;background:#f8fafc;"><div style="font-size:20px;font-weight:800;color:#1C2633;">${pontos.length}</div><div style="font-size:9px;color:#6b7280;text-transform:uppercase;">Medições</div></td>
       ${SEV_PDF.slice().reverse().map(s=>`
-      <td style="padding:12px 6px;border:1px solid #e5e7eb;text-align:center;background:${s.bg};"><div style="font-size:24px;font-weight:800;color:${s.c};">${sevCounts[s.k]}</div><div style="font-size:10px;color:${s.c};text-transform:uppercase;">${s.l}</div></td>`).join("")}
+      <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:center;background:${s.bg};"><div style="font-size:20px;font-weight:800;color:${s.c};">${sevCounts[s.k]}</div><div style="font-size:9px;color:${s.c};text-transform:uppercase;">${s.l}</div></td>`).join("")}
     </tr></tbody></table>
   </div>
   ${buildPizzaSVG(sevCounts,pontos.length)}
@@ -1230,17 +1239,15 @@ ${footerPag()}
   // ── ÚLTIMA PÁGINA: CONCLUSÕES ─────────────────────────────────────────────
   const compRows = rels3.map((r,i)=>{
     const pts=r.pontos||[];
-    const maxDt=Math.max(0,...pts.map(p=>parseFloat(p.deltaT)||0));
     return `<tr style="background:${i===0?"#fff7ed":"#fff"};">
       <td style="padding:7px 10px;border:1px solid #e5e7eb;font-weight:700;">${i===0?"Mais Recente":i+"ª Anterior"}</td>
       <td style="padding:7px 10px;border:1px solid #e5e7eb;">${fd(r.dataRelatorio)}</td>
       <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;">${pts.length}</td>
       <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#16a34a;">${pts.filter(p=>p.severidade==="normal").length}</td>
-      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#b45309;">${pts.filter(p=>p.severidade==="suspeita").length}</td>
-      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#c2410c;">${pts.filter(p=>p.severidade==="provavel").length}</td>
+      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#d97706;">${pts.filter(p=>p.severidade==="suspeita").length}</td>
+      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#ea580c;">${pts.filter(p=>p.severidade==="provavel").length}</td>
       <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#dc2626;">${pts.filter(p=>p.severidade==="certa").length}</td>
-      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#a21caf;">${pts.filter(p=>p.severidade==="iminente").length}</td>
-      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:${maxDt>=20?"#dc2626":maxDt>=10?"#b45309":"#16a34a"};">${maxDt>0?maxDt.toFixed(1)+"°C":"—"}</td>
+      <td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#c026d3;">${pts.filter(p=>p.severidade==="iminente").length}</td>
     </tr>`;
   }).join("");
 
@@ -1268,7 +1275,6 @@ ${footerPag()}
         <th style="padding:8px 10px;color:#fff;text-align:center;">🟠</th>
         <th style="padding:8px 10px;color:#fff;text-align:center;">🔴</th>
         <th style="padding:8px 10px;color:#fff;text-align:center;">🟣</th>
-        <th style="padding:8px 10px;color:#fff;text-align:center;">Maior ΔT</th>
       </tr></thead>
       <tbody>${compRows}</tbody>
     </table>
@@ -1277,6 +1283,7 @@ ${footerPag()}
   <div style="padding:0 36px 16px;">
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       ${[
+        ["Norma Petrobras N-2475","Critério de Classificação de Componentes Aquecidos (CFCA) — Proposição ICON, com referência à MIL-STD-2194 SH. Base da escala de severidade (Nível/Prioridade/P.R.I.) adotada neste relatório."],
         ["ABNT NBR 15763:2009","Termografia — Critérios de periodicidade de inspeção em sistemas elétricos de potência."],
         ["ABNT NBR 15866:2010","Termografia — Metodologia de avaliação de temperatura de trabalho em sistemas elétricos."],
         ["ABNT NBR 15572:2013","Termografia — Guia para inspeção de equipamentos elétricos e mecânicos."],
@@ -2311,10 +2318,17 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
       </div>
 
       {/* Identificação — com lista do cliente se disponível */}
-      {equipsCliente.length > 0 && (
+      {equipsCliente.length > 0 && (() => {
+        // Reflete no próprio select qual equipamento cadastrado já está preenchido no ponto (por tag+nome+tipo) —
+        // sem isso o select sempre voltava em branco (defaultValue) mesmo com os campos já preenchidos, o que
+        // acontecia sempre que o ponto vinha de outro lugar já preenchido (clonagem de relatório, por exemplo).
+        const equipAtualId = equipsCliente.find(eq =>
+          (eq.tag||"") === (p.tag||"") && (eq.nome||"") === (p.equipamento||"") && (eq.tipo||"") === (p.tipoEquip||"")
+        )?.id || "";
+        return (
         <div style={{marginBottom:12,background:T.panelInfo,border:"1px solid "+T.borderInfo,borderRadius:7,padding:"10px 14px"}}>
           <label style={{color:T.blue}}>🔗 Selecionar equipamento cadastrado</label>
-          <select onChange={e=>{
+          <select value={equipAtualId} onChange={e=>{
             const eq = equipsCliente.find(x=>x.id===e.target.value);
             if(eq){
               onChange("tag", eq.tag||"");
@@ -2324,12 +2338,13 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
               onChange("localizacao", eq.localizacao||"");
               onChange("codigoArea", eq.codigoArea||"");
             }
-          }} defaultValue="">
+          }}>
             <option value="">— Selecione para preencher automaticamente —</option>
             {[...equipsCliente].sort((a,b)=>(a.nome||"").localeCompare(b.nome||"","pt-BR")).map(eq=><option key={eq.id} value={eq.id}>{eq.tag?eq.tag+" — ":""}{eq.nome}{[eq.tipo,eq.periodicidade,eq.localizacao,eq.codigoArea].filter(Boolean).length?" · "+[eq.tipo,eq.periodicidade,eq.localizacao,eq.codigoArea].filter(Boolean).join(" · "):""}</option>)}
           </select>
         </div>
-      )}
+        );
+      })()}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10,marginBottom:12}}>
         <F l="TAG do Equipamento" v={p.tag||""} s={v=>onChange("tag",v)} ph="Ex: TR-01, QD-15"/>
         <F l="Identificação" v={p.equipamento} s={v=>onChange("equipamento",v)} ph="Ex: Quadro Geral"/>
