@@ -1078,7 +1078,7 @@ function buildReportHTML(rel, todosRelatorios) {
 
   // ── ÍNDICE (com quebra de página automática) ────────────────────────────
   // Dividir pontos em grupos de 20 por página
-  const PONTOS_POR_PAGINA_INDICE = 20;
+  const PONTOS_POR_PAGINA_INDICE = 25;
   const gruposIndice = [];
   for(let gi=0; gi<pontos.length; gi+=PONTOS_POR_PAGINA_INDICE) {
     gruposIndice.push(pontos.slice(gi, gi+PONTOS_POR_PAGINA_INDICE));
