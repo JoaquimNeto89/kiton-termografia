@@ -67,12 +67,14 @@ const LIGHT_THEME = {
 
 // ─── CFCA (Critério de Classificação de Componentes Aquecidos) ─────────────
 // Razão AC/MAA, onde MAA = MTA - Ta. As 5 faixas mapeiam 1:1 para os 5 níveis de severidade do app.
+// Fonte: CFCA — Critério de Classificação de Componentes Aquecidos (Proposição ICON / Norma Petrobras
+// N-2475; referência MIL-STD-2194 SH) — faixas e rótulos de prioridade conforme documento de referência.
 const CFCA_NIVEIS = [
-  { max: 0.3,  nivel: "Normal",             severidade: "normal",   prazo: "Rotina" },
-  { max: 0.6,  nivel: "Suspeita de Falha",  severidade: "suspeita", prazo: "Observação / nova medição em curto prazo" },
-  { max: 0.9,  nivel: "Falha Provável",     severidade: "provavel", prazo: "Intervenção programada" },
-  { max: 1.2,  nivel: "Falha Certa",        severidade: "certa",    prazo: "Intervenção imediata" },
-  { max: Infinity, nivel: "Falha Iminente", severidade: "iminente", prazo: "Crítico — ação imediata" },
+  { max: 0.3,  nivel: "Normal",             severidade: "normal",   prioridade: "Normal",                 significado: "Nenhum problema encontrado" },
+  { max: 0.6,  nivel: "Suspeita de Falha",  severidade: "suspeita", prioridade: "Observação",              significado: "Anomalia leve — recomenda-se nova medição em curto prazo" },
+  { max: 0.9,  nivel: "Falha Provável",     severidade: "provavel", prioridade: "Intervenção Programada",  significado: "Anomalia relevante — programar intervenção corretiva" },
+  { max: 1.2,  nivel: "Falha Certa",        severidade: "certa",    prioridade: "Intervenção Imediata",    significado: "Falha caracterizada — intervir o quanto antes" },
+  { max: Infinity, nivel: "Falha Iminente", severidade: "iminente", prioridade: "Crítica",                 significado: "Risco iminente de falha — ação imediata" },
 ];
 const classificaCFCA = razao => CFCA_NIVEIS.find(f => razao < f.max) || CFCA_NIVEIS[CFCA_NIVEIS.length-1];
 
@@ -95,7 +97,7 @@ function calcSeveridade(ponto, criterio) {
     const c = classificaCFCA(razao);
     return {
       severidade: c.severidade, severidadeAuto: true,
-      cfca: { razao: razao.toFixed(2), ac: ac.toFixed(1), maa: maa.toFixed(1), mta, nivel: c.nivel, prazo: c.prazo },
+      cfca: { razao: razao.toFixed(2), ac: ac.toFixed(1), maa: maa.toFixed(1), mta, nivel: c.nivel, prioridade: c.prioridade, significado: c.significado },
     };
   }
   if (criterio.metodo === "comparativo") {
@@ -163,16 +165,30 @@ const INITIAL = {
     criterios: [],   // {id, nome, grupo, metodo:"maa"|"comparativo"|"qualitativo", ...}
   }
 };
-// Migração/semente: transforma os 10 tipos fixos antigos (objeto NBR) em critérios método "comparativo",
-// preservando exatamente os valores atuais (nenhum número novo é inventado aqui).
-const seedCriteriosFromNBR = () => Object.entries(NBR).map(([tipo,c]) => ({
-  id: "seed-"+tipo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-"),
-  nome: tipo, grupo: tipo, metodo: "comparativo",
-  oQueComparado: c.ref, condicoes: "",
-  mta: "", toleranciaAlerta: c.alerta, toleranciaCritico: c.critico,
-  documentacaoNecessaria: "",
-  fonteNormativa: "", statusFonte: "interno", ativo: true,
-}));
+// Métodos com MTA definível (temperatura elétrica limite de projeto/placa) — candidatos naturais ao
+// MAA/CFCA. Os demais tipos legados seguem no método "comparativo" (compara com elemento similar/fase
+// adjacente), inclusive Motor Elétrico (mancais), cujo baseline é definido manualmente pelo técnico.
+const TIPOS_MAA_POR_PADRAO = ["Transformador","Subestação"];
+// Fonte normativa do próprio método MAA/CFCA (a fórmula e as 5 faixas), confirmada pelo documento
+// "Critério de Classificação de Componentes Aquecidos — Proposição ICON / Norma Petrobras N-2475
+// (referência MIL-STD-2194 SH)". Isto é diferente do MTA de cada equipamento (que é específico de
+// placa/documentação técnica de cada unidade e continua em branco, dependendo do técnico).
+const FONTE_CFCA = "CFCA — Critério de Classificação de Componentes Aquecidos (Proposição ICON / Norma Petrobras N-2475; referência MIL-STD-2194 SH)";
+// Migração/semente: transforma os 10 tipos fixos antigos (objeto NBR) em critérios cadastrados.
+// Os valores de ΔT (alerta/crítico) são preservados exatamente como estavam — nenhum número novo é
+// inventado aqui. Método reclassificado por tipo de equipamento (ver TIPOS_MAA_POR_PADRAO). MTA fica
+// em branco — é específico de cada equipamento, depende de validação técnica humana.
+const seedCriteriosFromNBR = () => Object.entries(NBR).map(([tipo,c]) => {
+  const isMaa = TIPOS_MAA_POR_PADRAO.includes(tipo);
+  return {
+    id: "seed-"+tipo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-"),
+    nome: tipo, grupo: tipo, metodo: isMaa ? "maa" : "comparativo",
+    oQueComparado: c.ref, condicoes: "",
+    mta: "", toleranciaAlerta: c.alerta, toleranciaCritico: c.critico,
+    documentacaoNecessaria: "",
+    fonteNormativa: isMaa ? FONTE_CFCA : "", statusFonte: isMaa ? "verificado" : "interno", ativo: true,
+  };
+});
 // Migração da severidade de 3 para 5 níveis: dados salvos antes desta versão só conheciam
 // "critico"/"alerta"/"normal". Mapeia para os novos nomes (mesma cor/posição, sem perda de sentido);
 // "provavel" e "iminente" só passam a existir organicamente em novas medições pelo método MAA/CFCA.
@@ -184,6 +200,22 @@ const migraSeveridade5Niveis = relatorios => (relatorios||[]).map(r => ({
     return p;
   }),
 }));
+// Reclassifica os critérios-seed de Transformador/Subestação de "comparativo" para "maa" — mesma regra
+// aplicada em seedCriteriosFromNBR, mas para quem já tinha os critérios cadastrados antes dessa decisão.
+// Só toca em critérios com id "seed-*" (os 10 originais): reclassifica o método apenas se ainda estiver
+// em "comparativo" (valor padrão de quando foram criados) e preenche Fonte/Status Normativa apenas se
+// ainda estiverem em branco/"interno" (valor padrão) — em ambos os casos, se o técnico já tiver mexido
+// manualmente, a migração não sobrescreve, para não apagar uma decisão humana.
+const migraCriteriosSeedParaMAA = criterios => (criterios||[]).map(c => {
+  const idSeedDe = t => "seed-"+t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-");
+  if (!TIPOS_MAA_POR_PADRAO.some(t => c.id === idSeedDe(t))) return c;
+  let u = c;
+  if (u.metodo === "comparativo") u = { ...u, metodo: "maa" };
+  if (u.metodo === "maa" && !u.fonteNormativa && (!u.statusFonte || u.statusFonte==="interno")) {
+    u = { ...u, fonteNormativa: FONTE_CFCA, statusFonte: "verificado" };
+  }
+  return u;
+});
 // Normaliza qualquer objeto de dados (localStorage, backup importado, ou payload vindo do Drive) para
 // o formato atual: garante os 4 cadastros, semeia critérios se ausentes, migra severidade para 5 níveis.
 // Usar em TODO ponto de entrada de dados (load, restaurar backup, trazer da nuvem) — não só no load() local.
@@ -194,6 +226,7 @@ const normalizeData = d => {
   if (!d.cadastros.instrumentos) d.cadastros.instrumentos = [];
   if (!d.cadastros.tecnicos) d.cadastros.tecnicos  = [];
   if (!d.cadastros.criterios) d.cadastros.criterios = seedCriteriosFromNBR();
+  d.cadastros.criterios = migraCriteriosSeedParaMAA(d.cadastros.criterios);
   if (!d.relatorios) d.relatorios = [];
   d.relatorios = migraSeveridade5Niveis(d.relatorios);
   return d;
@@ -720,6 +753,35 @@ function buildPizzaSVG(counts,total) {
   return '<div style="margin:16px 36px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:20px 28px;display:flex;align-items:center;gap:32px;flex-wrap:wrap;"><div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:-4px;">Distribuição por Severidade</div>'+svg+'<div style="display:flex;flex-direction:column;gap:4px;flex:1;">'+rows+'</div></div>';
 }
 
+// Legenda de classificação: nível de severidade → prioridade/ação recomendada → significado, em linguagem
+// direta para quem lê o relatório sem precisar conhecer a metodologia. Nomenclatura (nível e prioridade)
+// adotada conforme CFCA — a mesma escala de 5 níveis vale tanto para pontos calculados pelo MAA/CFCA quanto
+// para os classificados pelo método comparativo ou qualitativo (que resolvem num subconjunto dela).
+function buildLegendaSeveridade() {
+  const rows = CFCA_NIVEIS.map(n => {
+    const sp = SEV_PDF.find(s=>s.k===n.severidade);
+    return `<tr>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:center;"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${sp?.c||"#999"};"></span></td>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;color:${sp?.c||"#374151"};">${n.nivel}</td>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:600;">${n.prioridade}</td>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb;color:#6b7280;">${n.significado}</td>
+    </tr>`;
+  }).join("");
+  return `
+  <div style="padding:0 36px;margin-top:14px;">
+    <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Legenda de Classificação</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead><tr style="background:#1C2633;">
+        <th style="padding:6px 10px;color:#fff;width:30px;"></th>
+        <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">Nível</th>
+        <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">Prioridade</th>
+        <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">Significado</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="font-size:9px;color:#9ca3af;margin-top:4px;">Nomenclatura de severidade/prioridade conforme CFCA — ${FONTE_CFCA.replace("CFCA — Critério de Classificação de Componentes Aquecidos ","")}</div>
+  </div>`;
+}
 
 function buildReportHTML(rel, todosRelatorios) {
   const rels3 = [...(todosRelatorios||[])].filter(r=>r.cliente===rel.cliente).sort((a,b)=>new Date(b.dataRelatorio)-new Date(a.dataRelatorio)).slice(0,3);
@@ -867,6 +929,7 @@ function buildReportHTML(rel, todosRelatorios) {
       <td style="padding:12px 6px;border:1px solid #e5e7eb;text-align:center;background:${s.bg};"><div style="font-size:24px;font-weight:800;color:${s.c};">${sevCounts[s.k]}</div><div style="font-size:10px;color:${s.c};text-transform:uppercase;">${s.l}</div></td>`).join("")}
     </tr></tbody></table>
   </div>
+  ${buildLegendaSeveridade()}
   ${buildPizzaSVG(sevCounts,pontos.length)}
   <div style="flex:1;min-height:20px;"></div>
   ${footerPag()}
@@ -1700,10 +1763,10 @@ function Dashboard({ data={relatorios:[],cadastros:{clientes:[],cameras:[],tecni
               <table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead>
                   <tr style={{background:T.panelDeep,position:"sticky",top:0,zIndex:1}}>
-                    <th colSpan={2} style={{height:20}}></th>
-                    <th colSpan={5} style={{padding:"3px 12px",textAlign:"center",fontSize:9,fontWeight:700,color:T.textFaint,textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}}>🎯 Resultados de Severidade — Último Relatório</th>
+                    <th colSpan={2}></th>
+                    <th colSpan={5} style={{padding:"8px 12px",textAlign:"center",fontSize:11,fontWeight:700,color:T.textBright,textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}}>Resultados de Severidade — Último Relatório</th>
                   </tr>
-                  <tr style={{background:T.panelDeep,position:"sticky",top:20,zIndex:1}}>
+                  <tr style={{background:T.panelDeep,position:"sticky",top:33,zIndex:1}}>
                     {["Cliente","Qtd. de Relatórios","🟢","🟡","🟠","🔴","🟣"].map(h=>(
                       <th key={h} style={{padding:"8px 12px",textAlign:h==="Cliente"?"left":"center",fontSize:11,fontWeight:700,color:T.textBright,textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}}>{h}</th>
                     ))}
@@ -1860,8 +1923,14 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
     ...f, pontos:(f.pontos||[]).map(p=>{
       if(p.id!==id) return p;
       let u={...p,[k]:v};
+      const critAtual = (cadastros.criterios||[]).find(c=>c.nome===u.tipoEquip && c.ativo!==false);
       u.tempMedia = calcMedia(u.tempMax,u.tempMin);
-      u.deltaT    = calcDelta(u.tempMax,u.tempRef);
+      // ΔT exibido acompanha a base que cada método realmente usa na severidade: MAA/CFCA calcula a
+      // partir da Temperatura Ambiente (T.máx − T.amb = "AC" do CFCA); comparativo usa o elemento de
+      // referência informado (T.máx − T.referência). Assim o ΔT mostrado nunca diverge do valor que
+      // de fato definiu a severidade — antes ambos usavam T.referência mesmo para MAA, o que podia
+      // divergir do AC real caso o técnico preenchesse T.referência com um valor diferente de T.amb.
+      u.deltaT = critAtual?.metodo==="maa" ? calcDelta(u.tempMax,u.tempAmb) : calcDelta(u.tempMax,u.tempRef);
       if (k==="fatorCarga") {
         // Técnico digitou manualmente — respeita a escolha, não recalcula na próxima edição de corrente.
         u.fatorCargaAuto = false;
@@ -1878,7 +1947,7 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
         return u;
       }
       if (SEVERIDADE_RECALC_FIELDS.includes(k)) {
-        const criterio = (cadastros.criterios||[]).find(c=>c.nome===u.tipoEquip && c.ativo!==false);
+        const criterio = critAtual;
         const r = calcSeveridade(u, criterio);
         u.severidade = r.severidade;
         u.severidadeAuto = r.severidadeAuto;
@@ -2056,6 +2125,10 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
   const sev  = T.sev[p.severidade]||T.sev.normal;
   const criterios = cadastros.criterios||[];
   const crit = criterios.find(c=>c.nome===p.tipoEquip) || null;
+  // T. Referência só é usada pelo método comparativo (ΔT = T.máx − elemento de referência similar/fase
+  // adjacente). No MAA/CFCA a base é a Temperatura Ambiente (já coletada em Condições) + MTA do critério;
+  // no qualitativo não há fórmula. Sem critério cadastrado, mantém o campo por segurança/flexibilidade.
+  const showTempRef = !crit || crit.metodo === "comparativo";
   const dt   = parseFloat(p.deltaT);
   const isSubTrf = ["Subestação","Transformador"].includes(p.tipoEquip) || ["Subestação","Transformador"].includes(crit?.grupo);
 
@@ -2076,7 +2149,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
         </span>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <span style={{fontSize:12,background:sev.bg,color:sev.color,border:"1px solid "+sev.border,padding:"3px 12px",borderRadius:20,fontWeight:700}}>
-            {sev.icon} {sev.label} {!isNaN(dt)&&p.deltaT?`· ΔT ${p.deltaT}°C`:""}
+            {sev.icon} {sev.label} {!isNaN(dt)&&p.deltaT?`· ${crit?.metodo==="maa"?"AC":"ΔT"} ${p.deltaT}°C`:""}
           </span>
           {canRemove && <Btn onClick={onRemove} small danger>✕</Btn>}
         </div>
@@ -2168,11 +2241,18 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
       {/* Temperaturas: dados coletados em campo */}
       <div style={{marginBottom:12}}>
         <div style={{fontSize:11,fontWeight:700,color:T.blue,marginBottom:8,textTransform:"uppercase",letterSpacing:.8}}>📥 Dados Coletados em Campo</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+        <div style={{display:"grid",gridTemplateColumns:showTempRef?"repeat(3,1fr)":"repeat(2,1fr)",gap:8}}>
           <F l="T. Máx (°C)" t="number" v={p.tempMax} s={v=>onChange("tempMax",v)}/>
           <F l="T. Mín (°C)" t="number" v={p.tempMin} s={v=>onChange("tempMin",v)}/>
-          <F l="T. Referência (°C)" t="number" v={p.tempRef} s={v=>onChange("tempRef",v)} ph={p.tempAmb||"—"}/>
+          {showTempRef && <F l="T. Referência (°C)" t="number" v={p.tempRef} s={v=>onChange("tempRef",v)} ph={p.tempAmb||"—"}/>}
         </div>
+        {crit && !showTempRef && (
+          <div style={{fontSize:11,color:T.textFaint,marginTop:6}}>
+            {crit.metodo==="maa"
+              ? "Método MAA/CFCA: a severidade usa T. Máx (acima) + Temperatura Ambiente (em Condições) + MTA do critério. T. Referência não se aplica a este método."
+              : "Classificação qualitativa: T. Máx e T. Mín ficam registrados no relatório, mas não geram cálculo automático de severidade — o técnico classifica manualmente abaixo."}
+          </div>
+        )}
       </div>
 
       {/* Temperaturas (e, para Subestação/Transformador, Fator de Carga): dados calculados automaticamente */}
@@ -2184,7 +2264,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
             <input readOnly value={p.tempMedia} style={{cursor:"default"}}/>
           </div>
           <div>
-            <label>ΔT <span style={{color:T.green,fontWeight:400,textTransform:"none",letterSpacing:0}}>auto</span></label>
+            <label>{crit?.metodo==="maa" ? "AC (T.Máx − T.Amb)" : "ΔT"} <span style={{color:T.green,fontWeight:400,textTransform:"none",letterSpacing:0}}>auto</span></label>
             <input readOnly value={p.deltaT} style={{fontWeight:700,cursor:"default",
               color:!isNaN(dt)&&p.deltaT?(T.sev[p.severidade]?.color||T.green):T.textMuted}}/>
           </div>
@@ -2205,7 +2285,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
           {crit.metodo==="maa" && (
             <>
               <b style={{color:T.blue}}>Critério — {p.tipoEquip} (MAA/CFCA):</b> MTA = {crit.mta||"—"}°C
-              {p.cfca ? ` · MAA = ${p.cfca.maa}°C · Razão AC/MAA = ${p.cfca.razao} · ${p.cfca.nivel} (${p.cfca.prazo})`
+              {p.cfca ? ` · MAA = ${p.cfca.maa}°C · Razão AC/MAA = ${p.cfca.razao} · ${p.cfca.nivel} (${p.cfca.prioridade})`
                       : " · preencha T. Máx e T. Ambiente para calcular"}
             </>
           )}
