@@ -33,16 +33,17 @@ const DARK_THEME = {
   amber: "#f59e0b", amberBright: "#fbbf24",
   blue: "#60a5fa", blueBorder: "#3b82f6", blueStrong: "#2563eb",
   violet: "#a78bfa", violetBorder: "#7c3aed", indigo: "#818cf8", indigoBorder: "#6366f1", cyan: "#22d3ee", cyanBorder: "#0891b2",
-  // Escala de severidade de 5 níveis (CFCA). Rótulos usam a coluna "Prioridade/Classificação" do
-  // documento CFCA (curtos, cabem em badge/dashboard), não a "Diagnóstico" (essa fica só na Legenda
-  // de Classificação e no painel de info do ponto, ver CFCA_NIVEIS.nivel) — decisão do usuário.
+  // Escala de severidade de 5 níveis (CFCA). Rótulos são a coluna "Nível" (curta, uma palavra —
+  // Normal/Alarme/Atenção/Urgente/Crítico), usada em badge, dashboard, cadastros e resumo do PDF.
+  // O texto mais longo de diagnóstico + classificação (ex.: "Falha iminente (Intervenção imediata)")
+  // fica só na Legenda de Classificação e no painel de info do ponto, ver CFCA_NIVEIS.prioridade.
   // Cores validadas para contraste (WCAG) contra o fundo do badge e da página nos dois temas — ver nota de implementação.
   sev: {
-    normal:   { label: "Normal",                   color: "#22c55e", bg: "#052e16", border: "#14532d", icon: "🟢" },
-    suspeita: { label: "Alerta",                    color: "#f59e0b", bg: "#2d1f00", border: "#78350f", icon: "🟡" },
-    provavel: { label: "Intervenção Programada",    color: "#fb923c", bg: "#431407", border: "#9a3412", icon: "🟠" },
-    certa:    { label: "Intervenção Imediata",      color: "#ef4444", bg: "#3b0a0a", border: "#7f1d1d", icon: "🔴" },
-    iminente: { label: "Crítico",                   color: "#e879f9", bg: "#4a044e", border: "#86198f", icon: "🟣" },
+    normal:   { label: "Normal",  color: "#22c55e", bg: "#052e16", border: "#14532d", icon: "🟢" },
+    suspeita: { label: "Alarme",  color: "#f59e0b", bg: "#2d1f00", border: "#78350f", icon: "🟡" },
+    provavel: { label: "Atenção", color: "#fb923c", bg: "#431407", border: "#9a3412", icon: "🟠" },
+    certa:    { label: "Urgente", color: "#ef4444", bg: "#3b0a0a", border: "#7f1d1d", icon: "🔴" },
+    iminente: { label: "Crítico", color: "#e879f9", bg: "#4a044e", border: "#86198f", icon: "🟣" },
   },
 };
 
@@ -59,26 +60,29 @@ const LIGHT_THEME = {
   blue: "#2563eb", blueBorder: "#2563eb", blueStrong: "#2563eb",
   violet: "#7c3aed", violetBorder: "#7c3aed", indigo: "#4f46e5", indigoBorder: "#4f46e5", cyan: "#0e7490", cyanBorder: "#0e7490",
   sev: {
-    normal:   { label: "Normal",            color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", icon: "🟢" },
-    suspeita: { label: "Alerta",                    color: "#b45309", bg: "#fffbeb", border: "#fde68a", icon: "🟡" },
-    provavel: { label: "Intervenção Programada",    color: "#c2410c", bg: "#fff7ed", border: "#fed7aa", icon: "🟠" },
-    certa:    { label: "Intervenção Imediata",      color: "#dc2626", bg: "#fef2f2", border: "#fecaca", icon: "🔴" },
-    iminente: { label: "Crítico",                   color: "#a21caf", bg: "#fdf4ff", border: "#f0abfc", icon: "🟣" },
+    normal:   { label: "Normal",  color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", icon: "🟢" },
+    suspeita: { label: "Alarme",  color: "#d97706", bg: "#fffbeb", border: "#fde68a", icon: "🟡" },
+    provavel: { label: "Atenção", color: "#ea580c", bg: "#fff7ed", border: "#fed7aa", icon: "🟠" },
+    certa:    { label: "Urgente", color: "#dc2626", bg: "#fef2f2", border: "#fecaca", icon: "🔴" },
+    iminente: { label: "Crítico", color: "#c026d3", bg: "#fdf4ff", border: "#f0abfc", icon: "🟣" },
   },
 };
 
 // ─── CFCA (Critério de Classificação de Componentes Aquecidos) ─────────────
 // Razão AC/MAA, onde MAA = MTA - Ta. As 5 faixas mapeiam 1:1 para os 5 níveis de severidade do app.
 // Fonte: CFCA — Critério de Classificação de Componentes Aquecidos (Proposição ICON / Norma Petrobras
-// N-2475; referência MIL-STD-2194 SH) — tabela de Nível/Diagnóstico/Classificação/P.R.I. e texto de
-// "Interpretação dos níveis" conforme documento unificado de referência (substitui a versão anterior,
-// que divergia entre dois documentos parciais nos rótulos do nível 4 e 5).
+// N-2475; referência MIL-STD-2194 SH). Nomenclatura (nivel/prioridade/P.R.I.) conforme tabela de
+// referência final adotada pelo usuário (Nível curto de uma palavra + Prioridade combinando diagnóstico
+// e classificação entre parênteses) — vale para toda a plataforma (badges, dashboard, cadastros e PDF).
+// nivel      = rótulo curto (Normal/Alarme/Atenção/Urgente/Crítico) — usado em badge, dashboard e resumo.
+// prioridade = diagnóstico + classificação, texto mais longo — usado só na Legenda de Classificação e
+//              no painel de info do ponto.
 const CFCA_NIVEIS = [
-  { max: 0.3,  nivel: "Normal",                    severidade: "normal",   prioridade: "Normal",                 pri: "Sem intervenção / rotina", significado: "Condição térmica compatível com a operação. Mantém-se apenas a rotina de inspeção periódica." },
-  { max: 0.6,  nivel: "Suspeita de Falha",         severidade: "suspeita", prioridade: "Alerta",                 pri: "Mensal",                    significado: "Aquecimento acima do esperado, porém sem severidade. Manter acompanhamento com reinspeção mensal para verificar evolução." },
-  { max: 0.9,  nivel: "Falha Provável",            severidade: "provavel", prioridade: "Intervenção Programada", pri: "Até 21 dias",                significado: "Evidência consistente de degradação (mau contato, aperto insuficiente, oxidação, desequilíbrio ou sobrecarga). Correção em até 21 dias, podendo ser incorporada à próxima parada." },
-  { max: 1.2,  nivel: "Falha Potencial / Certa",   severidade: "certa",    prioridade: "Intervenção Imediata",   pri: "Até 14 dias",                significado: "Componente opera muito próximo do seu limite térmico. A falha é considerada certa se a condição persistir; deve ser programada parada corretiva em até 14 dias." },
-  { max: Infinity, nivel: "Falha Iminente",        severidade: "iminente", prioridade: "Crítico",                pri: "Até 7 dias",                 significado: "Acréscimo medido ultrapassou o limite admissível do componente. Risco de falha iminente, com possibilidade de interrupção não programada, dano a equipamentos adjacentes e risco à segurança. Requer avaliação da necessidade de desligamento imediato ou redução de carga." },
+  { max: 0.3,  nivel: "Normal",  severidade: "normal",   prioridade: "Normal (Rotina de inspeção contínua)",              pri: "Sem intervenção / rotina", significado: "Condição térmica compatível com a operação. Mantém-se apenas a rotina de inspeção periódica." },
+  { max: 0.6,  nivel: "Alarme",  severidade: "suspeita", prioridade: "Suspeita de falha (Acompanhamento / Monitoração)", pri: "Mensal",                    significado: "Aquecimento acima do esperado, porém sem severidade. Manter acompanhamento com reinspeção mensal para verificar evolução." },
+  { max: 0.9,  nivel: "Atenção", severidade: "provavel", prioridade: "Falha provável (Ação preventiva / Planejada)",      pri: "Até 21 dias",                significado: "Evidência consistente de degradação (mau contato, aperto insuficiente, oxidação, desequilíbrio ou sobrecarga). Correção em até 21 dias, podendo ser incorporada à próxima parada." },
+  { max: 1.2,  nivel: "Urgente", severidade: "certa",    prioridade: "Falha potencial (Correção programada)",            pri: "Até 14 dias",                significado: "Componente opera muito próximo do seu limite térmico. A falha é considerada certa se a condição persistir; deve ser programada parada corretiva em até 14 dias." },
+  { max: Infinity, nivel: "Crítico", severidade: "iminente", prioridade: "Falha iminente (Intervenção imediata)",        pri: "Até 7 dias",                 significado: "Acréscimo medido ultrapassou o limite admissível do componente. Risco de falha iminente, com possibilidade de interrupção não programada, dano a equipamentos adjacentes e risco à segurança. Requer avaliação da necessidade de desligamento imediato ou redução de carga." },
 ];
 const classificaCFCA = razao => CFCA_NIVEIS.find(f => razao < f.max) || CFCA_NIVEIS[CFCA_NIVEIS.length-1];
 
@@ -780,11 +784,11 @@ export default function App() {
 // ─── EXPORT PDF ───────────────────────────────────────────────────────────────
 // Paleta de severidade (5 níveis) para o PDF — sempre em fundo claro, validada para contraste.
 const SEV_PDF = [
-  { k:"iminente", l:"Crítico",                c:"#a21caf", bg:"#fdf4ff" },
-  { k:"certa",    l:"Intervenção Imediata",   c:"#dc2626", bg:"#fef2f2" },
-  { k:"provavel", l:"Intervenção Programada", c:"#c2410c", bg:"#fff7ed" },
-  { k:"suspeita", l:"Alerta",                 c:"#b45309", bg:"#fffbeb" },
-  { k:"normal",   l:"Normal",                 c:"#16a34a", bg:"#f0fdf4" },
+  { k:"iminente", l:"Crítico", c:"#c026d3", bg:"#fdf4ff" },
+  { k:"certa",    l:"Urgente", c:"#dc2626", bg:"#fef2f2" },
+  { k:"provavel", l:"Atenção", c:"#ea580c", bg:"#fff7ed" },
+  { k:"suspeita", l:"Alarme",  c:"#d97706", bg:"#fffbeb" },
+  { k:"normal",   l:"Normal",  c:"#16a34a", bg:"#f0fdf4" },
 ];
 function buildPizzaSVG(counts,total) {
   if(!total||total===0) return "";
@@ -811,16 +815,22 @@ function buildPizzaSVG(counts,total) {
   return '<div style="margin:12px 36px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:14px 24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;"><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:-2px;">Distribuição por Severidade</div>'+svg+'<div style="display:flex;flex-direction:column;gap:2px;flex:1;">'+rows+'</div></div>';
 }
 
-// Legenda de classificação: nível de severidade → prioridade/ação recomendada → significado, em linguagem
+// Legenda de classificação: nível de severidade → prioridade/ação recomendada → descrição, em linguagem
 // direta para quem lê o relatório sem precisar conhecer a metodologia. Nomenclatura (nível e prioridade)
 // adotada conforme CFCA — a mesma escala de 5 níveis vale tanto para pontos calculados pelo MAA/CFCA quanto
 // para os classificados pelo método comparativo ou qualitativo (que resolvem num subconjunto dela).
+// Nível é exibido como badge (mesma cor "viva" usada no dashboard/pizza chart do app), não como texto
+// colorido puro — mantém a identidade visual do app e preserva legibilidade no papel.
 function buildLegendaSeveridade() {
   const rows = CFCA_NIVEIS.map(n => {
     const sp = SEV_PDF.find(s=>s.k===n.severidade);
+    const cor = sp?.c||"#374151", bg = sp?.bg||"#f3f4f6";
     return `<tr>
-      <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:center;"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${sp?.c||"#999"};"></span></td>
-      <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;color:${sp?.c||"#374151"};">${n.nivel}</td>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb;">
+        <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:${bg};border:1px solid ${cor};font-weight:700;color:${cor};font-size:11px;white-space:nowrap;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${cor};flex-shrink:0;"></span>${n.nivel}
+        </span>
+      </td>
       <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:600;">${n.prioridade}</td>
       <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:600;white-space:nowrap;">${n.pri}</td>
       <td style="padding:6px 10px;border:1px solid #e5e7eb;color:#6b7280;">${n.significado}</td>
@@ -830,15 +840,14 @@ function buildLegendaSeveridade() {
   <div style="padding:0 36px;">
     <table style="width:100%;border-collapse:collapse;font-size:11px;">
       <thead><tr style="background:#1C2633;">
-        <th style="padding:6px 10px;color:#fff;width:30px;"></th>
         <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">Nível</th>
         <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">Prioridade</th>
         <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">P.R.I.</th>
-        <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">Significado</th>
+        <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">Descrição</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div style="font-size:9px;color:#9ca3af;margin-top:4px;">P.R.I. = Prazo Recomendável para Intervenção (pode ser antecipado conforme criticidade operacional do ativo, redundância e condições de acesso/segurança). Nível/P.R.I. conforme CFCA — ${FONTE_CFCA.replace("CFCA — Critério de Classificação de Componentes Aquecidos ","")} — Prioridade "Alerta" substitui o termo "Observação" do documento original, por preferência interna Kiton.</div>
+    <div style="font-size:9px;color:#9ca3af;margin-top:4px;">P.R.I. = Prazo Recomendável para Intervenção (pode ser antecipado conforme criticidade operacional do ativo, redundância e condições de acesso/segurança). Nível/Prioridade/P.R.I. conforme CFCA — ${FONTE_CFCA.replace("CFCA — Critério de Classificação de Componentes Aquecidos ","")}.</div>
   </div>`;
 }
 
@@ -917,7 +926,7 @@ function buildReportHTML(rel, todosRelatorios) {
     }
     if (c.metodo==="qualitativo") return c.documentacaoNecessaria ? `Classificação manual · ${c.documentacaoNecessaria}` : "Classificação manual pelo técnico";
     return (c.toleranciaAlerta!==""&&c.toleranciaAlerta!=null&&c.toleranciaCritico!==""&&c.toleranciaCritico!=null)
-      ? `🟡 Alerta ≥${c.toleranciaAlerta}°C · 🔴 Interv. Imediata ≥${c.toleranciaCritico}°C` : "Sem tolerância numérica — classificação manual";
+      ? `🟡 Alarme ≥${c.toleranciaAlerta}°C · 🔴 Urgente ≥${c.toleranciaCritico}°C` : "Sem tolerância numérica — classificação manual";
   };
   // Numeração das seções: Identificação > Instrumentos (se houver) > Critérios (se houver) > Resumo (pág. 1)
   // > Legenda de Classificação > Legenda de Siglas (pág. 2, dedicada — evita estourar a pág. 1 quando há
@@ -949,6 +958,10 @@ function buildReportHTML(rel, todosRelatorios) {
   function sec(titulo) { return `<div style="font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;color:#1C2633;margin:20px 36px 8px;padding-bottom:4px;border-bottom:2px solid #CD0000;text-transform:uppercase;letter-spacing:.8px;">${titulo}</div>`; }
 
   function infoRow(pairs) { return `<tr>${pairs.map(([k,v])=>`<td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;background:#f8fafc;width:150px;color:#374151;font-size:12px;">${k}</td><td style="padding:6px 10px;border:1px solid #e5e7eb;font-size:12px;">${v||"—"}</td>`).join("")}</tr>`; }
+
+  // Quebra "Nome — CREA-PR X" em duas linhas (nome / CREA-PR), independente do técnico selecionado —
+  // o formato "Nome — CREA-PR X" é montado no <select> de Técnico Responsável (cadastro de técnicos).
+  const tecnicoDuasLinhas = t => (t||"").replace(" — CREA-PR ", "<br/>CREA-PR ");
 
   // Sub-cabeçalho dentro de uma tabela de infoRow, para separar grupos de campos (ex.: coletado em campo vs. calculado)
   function subRow(label,bg) { return `<tr><td colspan="4" style="padding:${bg?"7px 10px":"10px 10px 4px"};border:none;background:${bg||"transparent"};font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.6px;">${label}</td></tr>`; }
@@ -982,7 +995,7 @@ function buildReportHTML(rel, todosRelatorios) {
       ${infoRow([["Cliente",rel.cliente],["Nº Relatório",rel.numRelatorio||"—"]])}
       ${infoRow([["Nº OS",rel.os||"—"],["Data do Relatório",fd(rel.dataRelatorio)]])}
       ${infoRow([["Local / Unidade",rel.local||"—"],["Responsável Cliente",rel.responsavel||"—"]])}
-      ${infoRow([["Técnico Responsável",rel.tecnico||"—"],["Nº ART",rel.numArt||"—"]]) }
+      ${infoRow([["Técnico Responsável",tecnicoDuasLinhas(rel.tecnico)],["Nº ART",rel.numArt||"—"]]) }
     </table>
   </div>
   ${temInstrumentos?`
@@ -1236,10 +1249,10 @@ ${footerPag()}
   ${header()}
   ${sec("Conclusões e Análise de Tendência")}
   <div style="padding:0 36px;">
-    ${sevCounts.iminente>0?`<div style="background:#fdf4ff;border:1px solid #f0abfc;border-left:4px solid #a21caf;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#a21caf;">🟣 CRÍTICO — AÇÃO IMEDIATA</b><br/>Foram identificadas ${sevCounts.iminente} medição(ões) em nível Crítico. Recomenda-se intervenção imediata, antes de qualquer outra prioridade deste relatório.</div>`:""}
-    ${sevCounts.certa>0?`<div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#dc2626;">⚠️ INTERVENÇÃO NECESSÁRIA</b><br/>Foram identificadas ${sevCounts.certa} medição(ões) em Intervenção Imediata. Recomenda-se ação corretiva prioritária.</div>`:""}
-    ${sevCounts.provavel>0?`<div style="background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #c2410c;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#c2410c;">🟠 INTERVENÇÃO PROGRAMADA</b><br/>Foram identificadas ${sevCounts.provavel} medição(ões) em Intervenção Programada. Recomenda-se programar a intervenção.</div>`:""}
-    ${sevCounts.suspeita>0?`<div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #b45309;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#b45309;">🟡 OBSERVAÇÃO RECOMENDADA</b><br/>Foram identificadas ${sevCounts.suspeita} medição(ões) com suspeita de falha. Recomenda-se nova medição em curto prazo.</div>`:""}
+    ${sevCounts.iminente>0?`<div style="background:#fdf4ff;border:1px solid #f0abfc;border-left:4px solid #c026d3;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#c026d3;">🟣 CRÍTICO — AÇÃO IMEDIATA</b><br/>Foram identificadas ${sevCounts.iminente} medição(ões) em nível Crítico. Recomenda-se intervenção imediata, antes de qualquer outra prioridade deste relatório.</div>`:""}
+    ${sevCounts.certa>0?`<div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#dc2626;">🔴 URGENTE — INTERVENÇÃO NECESSÁRIA</b><br/>Foram identificadas ${sevCounts.certa} medição(ões) em nível Urgente. Recomenda-se ação corretiva prioritária.</div>`:""}
+    ${sevCounts.provavel>0?`<div style="background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #ea580c;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#ea580c;">🟠 ATENÇÃO — INTERVENÇÃO PROGRAMADA</b><br/>Foram identificadas ${sevCounts.provavel} medição(ões) em nível Atenção. Recomenda-se programar a intervenção.</div>`:""}
+    ${sevCounts.suspeita>0?`<div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #d97706;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#d97706;">🟡 ALARME — ACOMPANHAMENTO RECOMENDADO</b><br/>Foram identificadas ${sevCounts.suspeita} medição(ões) em nível Alarme. Recomenda-se acompanhamento e nova medição em curto prazo.</div>`:""}
     ${(sevCounts.iminente+sevCounts.certa+sevCounts.provavel+sevCounts.suspeita)===0?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #16a34a;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#16a34a;">✅ INSTALAÇÃO EM CONDIÇÕES NORMAIS</b><br/>Nenhuma anomalia identificada. Manter monitoramento conforme periodicidade estabelecida.</div>`:""}
   </div>
   ${rels3.length>=2?`
@@ -1281,7 +1294,7 @@ ${footerPag()}
       <div style="flex:1;min-width:200px;text-align:center;">
         <div style="border:1px solid #d1d5db;border-radius:6px;padding:20px 16px;">
           <div style="height:70px;border-bottom:1px solid #374151;margin-bottom:12px;"></div>
-          <div style="font-size:12px;color:#374151;line-height:1.6;"><b>${rel.tecnico||"Técnico Responsável"}</b><br/>Kiton Engenharia Integrada<br/>CREA-PR 76327</div>
+          <div style="font-size:12px;color:#374151;line-height:1.6;"><b>${rel.tecnico?tecnicoDuasLinhas(rel.tecnico):"Técnico Responsável"}</b><br/>Kiton Engenharia Integrada<br/>CREA-PR 76327</div>
         </div>
       </div>
       <div style="flex:1;min-width:200px;text-align:center;">
@@ -1414,11 +1427,11 @@ function exportJPG(rel, todosRelatorios) {
 function PizzaChart({ counts={}, total }) {
   if (!total || total === 0) return null;
   const SEV5 = [
-    { key:"iminente", label:"Crítico",                color:"#e879f9" },
-    { key:"certa",    label:"Intervenção Imediata",   color:"#ef4444" },
-    { key:"provavel", label:"Intervenção Programada", color:"#fb923c" },
-    { key:"suspeita", label:"Alerta",                 color:"#f59e0b" },
-    { key:"normal",   label:"Normal",                 color:"#22c55e" },
+    { key:"iminente", label:"Crítico", color:"#e879f9" },
+    { key:"certa",    label:"Urgente", color:"#ef4444" },
+    { key:"provavel", label:"Atenção", color:"#fb923c" },
+    { key:"suspeita", label:"Alarme",  color:"#f59e0b" },
+    { key:"normal",   label:"Normal",  color:"#22c55e" },
   ];
   const data = SEV5.map(s=>({label:s.label,val:counts[s.key]||0,color:s.color})).filter(d=>d.val>0);
   if (data.length===0) return null;
@@ -1659,8 +1672,8 @@ function CadCriterios({ items, onSave, onDelete }) {
           )}
           {form.metodo==="comparativo" && (
             <G3 mb={12}>
-              <F l="ΔT Alerta (°C) *" t="number" v={form.toleranciaAlerta||""} s={v=>set("toleranciaAlerta",v)} ph="Ex: 10"/>
-              <F l="ΔT Intervenção Imediata (°C) *" t="number" v={form.toleranciaCritico||""} s={v=>set("toleranciaCritico",v)} ph="Ex: 20"/>
+              <F l="ΔT Alarme (°C) *" t="number" v={form.toleranciaAlerta||""} s={v=>set("toleranciaAlerta",v)} ph="Ex: 10"/>
+              <F l="ΔT Urgente (°C) *" t="number" v={form.toleranciaCritico||""} s={v=>set("toleranciaCritico",v)} ph="Ex: 20"/>
               <F l="O que é comparado (referência)" v={form.oQueComparado||""} s={v=>set("oQueComparado",v)} ph="Ex: Fase adjacente / mancal similar / leitura anterior do mesmo ponto"/>
             </G3>
           )}
@@ -1690,7 +1703,7 @@ function CadCriterios({ items, onSave, onDelete }) {
             <Btn success onClick={()=>{
               if(!form.nome||!form.grupo){alert("Nome e Grupo são obrigatórios");return;}
               if(form.metodo==="maa" && !MTA_SUBTIPOS[form.nome] && !form.mta){alert("Informe o MTA para o método MAA/CFCA");return;}
-              if(form.metodo==="comparativo" && (form.toleranciaAlerta===""||form.toleranciaCritico==="")){alert("Informe as tolerâncias de Alerta e Intervenção Imediata para o método Comparativo");return;}
+              if(form.metodo==="comparativo" && (form.toleranciaAlerta===""||form.toleranciaCritico==="")){alert("Informe as tolerâncias de Alarme e Urgente para o método Comparativo");return;}
               onSave(form);setForm(null);
             }}>✅ Salvar</Btn>
             <Btn onClick={()=>setForm(null)}>Cancelar</Btn>
@@ -1727,7 +1740,7 @@ function CadCriterios({ items, onSave, onDelete }) {
                       <div style={{fontWeight:700,color:T.textBright}}>{item.nome}</div>
                       <div style={{fontSize:12,color:T.textFaint,marginTop:2}}>
                         {item.metodo==="maa" && (MTA_SUBTIPOS[item.nome] ? `MTA por Subtipo (${MTA_SUBTIPOS[item.nome].length} opções, ${Math.min(...MTA_SUBTIPOS[item.nome].map(s=>s.mta))}–${Math.max(...MTA_SUBTIPOS[item.nome].map(s=>s.mta))}°C)` : `MTA: ${item.mta||"—"}°C`)}
-                        {item.metodo==="comparativo" && `Alerta ≥ ${item.toleranciaAlerta||"—"}°C · Interv. Imediata ≥ ${item.toleranciaCritico||"—"}°C`}
+                        {item.metodo==="comparativo" && `Alarme ≥ ${item.toleranciaAlerta||"—"}°C · Urgente ≥ ${item.toleranciaCritico||"—"}°C`}
                         {item.metodo==="qualitativo" && "Classificação manual"}
                         {item.fonteNormativa && ` · ${item.fonteNormativa}`}
                       </div>
@@ -2423,7 +2436,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
           {crit.metodo==="maa" && (
             <>
               <b style={{color:T.blue}}>Critério — {p.tipoEquip}{p.subtipoEquip?` · ${p.subtipoEquip}`:""} (MAA/CFCA):</b> MTA = {p.cfca?.mta ?? (MTA_SUBTIPOS[p.tipoEquip] ? "—" : (crit.mta||"—"))}°C
-              {p.cfca ? ` · MAA = ${p.cfca.maa}°C · Razão AC/MAA = ${p.cfca.razao} · ${p.cfca.nivel} (${p.cfca.prioridade}) · P.R.I.: ${p.cfca.pri}`
+              {p.cfca ? ` · MAA = ${p.cfca.maa}°C · Razão AC/MAA = ${p.cfca.razao} · ${p.cfca.nivel} · ${p.cfca.prioridade} · P.R.I.: ${p.cfca.pri}`
                       : (MTA_SUBTIPOS[p.tipoEquip] && !p.subtipoEquip)
                         ? " · selecione o Subtipo acima para calcular"
                         : " · preencha T. Máx e T. Ambiente para calcular"}
@@ -2431,7 +2444,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
           )}
           {crit.metodo==="comparativo" && (
             (crit.toleranciaAlerta!==""&&crit.toleranciaCritico!=="") ? (
-              <><b style={{color:T.blue}}>Critério — {p.tipoEquip}:</b> {crit.oQueComparado?`Ref. = ${crit.oQueComparado} · `:""}🟡 Alerta ≥{crit.toleranciaAlerta}°C · 🔴 Interv. Imediata ≥{crit.toleranciaCritico}°C</>
+              <><b style={{color:T.blue}}>Critério — {p.tipoEquip}:</b> {crit.oQueComparado?`Ref. = ${crit.oQueComparado} · `:""}🟡 Alarme ≥{crit.toleranciaAlerta}°C · 🔴 Urgente ≥{crit.toleranciaCritico}°C</>
             ) : (
               <><b style={{color:T.amber}}>Critério — {p.tipoEquip}:</b> sem tolerância numérica cadastrada — classifique a severidade manualmente.</>
             )
@@ -2547,7 +2560,7 @@ function Comparativo({ cliente, relatorios, onBack }) {
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
           <thead>
             <tr style={{background:T.panelDeep}}>
-              {["Inspeção","Data","Medições","🟢 Normais","🟡 Alertas","🟠 Programadas","🔴 Imediatas","🟣 Críticos","Maior ΔT"].map(h=>(
+              {["Inspeção","Data","Medições","🟢 Normal","🟡 Alarme","🟠 Atenção","🔴 Urgente","🟣 Crítico","Maior ΔT"].map(h=>(
                 <th key={h} style={{padding:"11px 14px",textAlign:"left",fontSize:11,fontWeight:700,color:T.textMuted,letterSpacing:.8,textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr>
