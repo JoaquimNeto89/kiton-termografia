@@ -976,9 +976,43 @@ function buildReportHTML(rel, todosRelatorios) {
   function subRow(label,bg) { return `<tr><td colspan="4" style="padding:${bg?"7px 10px":"10px 10px 4px"};border:none;background:${bg||"transparent"};font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.6px;">${label}</td></tr>`; }
 
   // Calcular total de páginas
-  const numGruposIndice = Math.ceil(pontos.length / 20) || 1;
+  const PONTOS_POR_PAGINA_INDICE = 25;
+  const numGruposIndice = Math.ceil(pontos.length / PONTOS_POR_PAGINA_INDICE) || 1;
   const PAGS_FIXAS_INICIO = 2; // capa (pág. 1) + legenda (pág. 2)
-  const totalPaginas = PAGS_FIXAS_INICIO + numGruposIndice + (pontos.length * 2) + 1;
+
+  // ── Paginação da Página Final (Conclusões/Comparativo/Referências/Assinaturas) ──────────
+  // Alguns blocos dessa página variam de tamanho conforme os dados (nº de níveis de severidade
+  // presentes no relatório, nº de relatórios no comparativo). Se a soma ultrapassar o espaço útil
+  // de uma folha, o bloco INTEIRO (nunca cortado no meio) é empurrado para a página seguinte —
+  // por isso o cálculo de quantas páginas finais serão usadas (paginacaoFinal) precisa acontecer
+  // aqui, ANTES do totalPaginas, e é reaproveitado depois na montagem real do HTML (mesma função
+  // empacotarBlocos, mesmos custos), para os dois nunca ficarem dessincronizados.
+  const ALTURA_SEC = 34;       // título de seção (sec()) com suas margens
+  const CUSTO_ALERTA_BOX = 72; // por caixa de alerta (Crítico/Urgente/Atenção/Alarme/Normal)
+  const CUSTO_REFERENCIAS = 225; // tabela de Referências Normativas (estática, 5 linhas fixas)
+  const CUSTO_ASSINATURAS = 265; // bloco das 2 caixas de assinatura
+  const custoComparativo = linhas => 40 + linhas*33;
+  const BUDGET_PAGINA_FINAL = 880; // px úteis abaixo do cabeçalho e acima da área reservada ao rodapé (297mm)
+  const numAlertBoxes = (sevCounts.iminente>0?1:0)+(sevCounts.certa>0?1:0)+(sevCounts.provavel>0?1:0)+(sevCounts.suspeita>0?1:0) || 1;
+  function empacotarBlocos(blocos, budget) {
+    const paginas = [[]];
+    let usado = 0;
+    blocos.forEach(b => {
+      if (usado + b.h > budget && paginas[paginas.length-1].length > 0) { paginas.push([]); usado = 0; }
+      paginas[paginas.length-1].push(b.key);
+      usado += b.h;
+    });
+    return paginas;
+  }
+  const blocosPaginaFinal = [
+    { key:"conclusoes", h: ALTURA_SEC + numAlertBoxes*CUSTO_ALERTA_BOX },
+    ...(rels3.length>=2 ? [{ key:"comparativo", h: ALTURA_SEC + custoComparativo(rels3.length) }] : []),
+    { key:"referencias", h: ALTURA_SEC + CUSTO_REFERENCIAS },
+    { key:"assinaturas", h: ALTURA_SEC + CUSTO_ASSINATURAS },
+  ];
+  const paginacaoFinal = empacotarBlocos(blocosPaginaFinal, BUDGET_PAGINA_FINAL);
+
+  const totalPaginas = PAGS_FIXAS_INICIO + numGruposIndice + (pontos.length * 2) + paginacaoFinal.length;
   // Página (absoluta, 1-indexada) onde começa a ficha do ponto i: capa+legenda + páginas de índice + fichas anteriores (2 cada) + 1
   const paginaFichaDoPonto = i => PAGS_FIXAS_INICIO + numGruposIndice + i*2 + 1;
   let paginaAtual = 0;
@@ -1077,8 +1111,8 @@ function buildReportHTML(rel, todosRelatorios) {
 </div>`;
 
   // ── ÍNDICE (com quebra de página automática) ────────────────────────────
-  // Dividir pontos em grupos de 20 por página
-  const PONTOS_POR_PAGINA_INDICE = 25;
+  // Dividir pontos em grupos de PONTOS_POR_PAGINA_INDICE por página (constante declarada acima,
+  // junto ao cálculo de totalPaginas, para as duas contas nunca ficarem dessincronizadas de novo)
   const gruposIndice = [];
   for(let gi=0; gi<pontos.length; gi+=PONTOS_POR_PAGINA_INDICE) {
     gruposIndice.push(pontos.slice(gi, gi+PONTOS_POR_PAGINA_INDICE));
@@ -1251,9 +1285,11 @@ ${footerPag()}
     </tr>`;
   }).join("");
 
-  const pageUltima = `
-<div class="page">
-  ${header()}
+  // Cada bloco abaixo é montado separadamente (sem o wrapper .page/header/footer) para poder ser
+  // remontado em 1 ou mais páginas físicas conforme "paginacaoFinal" (calculado acima, junto ao
+  // totalPaginas) — se um bloco inteiro não couber no espaço restante da folha, ele vai INTEIRO
+  // para a próxima página, nunca sendo cortado pelo rodapé.
+  const blocoConclusoes = `
   ${sec("Conclusões e Análise de Tendência")}
   <div style="padding:0 36px;">
     ${sevCounts.iminente>0?`<div style="background:#fdf4ff;border:1px solid #f0abfc;border-left:4px solid #c026d3;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#c026d3;">🟣 CRÍTICO — AÇÃO IMEDIATA</b><br/>Foram identificadas ${sevCounts.iminente} medição(ões) em nível Crítico. Recomenda-se intervenção imediata, antes de qualquer outra prioridade deste relatório.</div>`:""}
@@ -1261,8 +1297,9 @@ ${footerPag()}
     ${sevCounts.provavel>0?`<div style="background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #ea580c;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#ea580c;">🟠 ATENÇÃO — INTERVENÇÃO PROGRAMADA</b><br/>Foram identificadas ${sevCounts.provavel} medição(ões) em nível Atenção. Recomenda-se programar a intervenção.</div>`:""}
     ${sevCounts.suspeita>0?`<div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #d97706;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#d97706;">🟡 ALARME — ACOMPANHAMENTO RECOMENDADO</b><br/>Foram identificadas ${sevCounts.suspeita} medição(ões) em nível Alarme. Recomenda-se acompanhamento e nova medição em curto prazo.</div>`:""}
     ${(sevCounts.iminente+sevCounts.certa+sevCounts.provavel+sevCounts.suspeita)===0?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #16a34a;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#16a34a;">✅ INSTALAÇÃO EM CONDIÇÕES NORMAIS</b><br/>Nenhuma anomalia identificada. Manter monitoramento conforme periodicidade estabelecida.</div>`:""}
-  </div>
-  ${rels3.length>=2?`
+  </div>`;
+
+  const blocoComparativo = rels3.length>=2 ? `
   ${sec("Comparativo — Últimas "+rels3.length+" Inspeções")}
   <div style="padding:0 36px;">
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -1278,7 +1315,9 @@ ${footerPag()}
       </tr></thead>
       <tbody>${compRows}</tbody>
     </table>
-  </div>`:""}
+  </div>` : "";
+
+  const blocoReferencias = `
   ${sec("Referências Normativas")}
   <div style="padding:0 36px 16px;">
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -1294,10 +1333,12 @@ ${footerPag()}
         <td style="padding:8px 12px;border:1px solid #e5e7eb;">${desc}</td>
       </tr>`).join("")}
     </table>
-  </div>
+  </div>`;
+
+  const blocoAssinaturas = `
   ${sec("Assinaturas")}
   <div style="padding:0 36px 24px;">
-    <div style="display:flex;gap:40px;margin-top:24px;flex-wrap:wrap;">
+    <div style="display:flex;gap:40px;flex-wrap:wrap;">
       <div style="flex:1;min-width:200px;text-align:center;">
         <div style="border:1px solid #d1d5db;border-radius:6px;padding:20px 16px;">
           <div style="height:70px;border-bottom:1px solid #374151;margin-bottom:12px;"></div>
@@ -1311,10 +1352,17 @@ ${footerPag()}
         </div>
       </div>
     </div>
-  </div>
-  <div style="flex:1;min-height:20px;"></div>
+  </div>`;
+
+  const BLOCOS_FINAL = { conclusoes: blocoConclusoes, comparativo: blocoComparativo, referencias: blocoReferencias, assinaturas: blocoAssinaturas };
+
+  const pageUltima = paginacaoFinal.map((grupo, gi) => `
+<div class="page">
+  ${header()}
+  ${grupo.map(k=>BLOCOS_FINAL[k]).join("\n")}
+  ${gi===paginacaoFinal.length-1?'<div style="flex:1;min-height:20px;"></div>':''}
   ${footerPag()}
-</div>`;
+</div>`).join("\n");
 
 
   return `<!DOCTYPE html>
@@ -1770,7 +1818,7 @@ function CadCriterios({ items, onSave, onDelete }) {
 
 function CadInstrumentos({ items, onSave, onDelete }) {
   const T = useContext(ThemeContext);
-  const tiposInstr = ["Câmera Termográfica","Anemômetro","Termômetro","Medidor de Umidade","Termopar","Multímetro","Alicate Amperímetro","Outro"];
+  const tiposInstr = ["Câmera Termográfica","Anemômetro","Termômetro","Higrômetro","Termopar","Multímetro","Alicate Amperímetro","Outro"];
   const empty = {id:"",tipo:"",fabricante:"",modelo:"",serie:"",tag:"",calibracao:""};
   const [form,setForm] = useState(null);
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
@@ -1783,7 +1831,7 @@ function CadInstrumentos({ items, onSave, onDelete }) {
       {form && (
         <div style={{background:T.panel,border:"1px solid "+T.accent,borderRadius:10,padding:20,marginBottom:20}}>
           <ST style={{marginBottom:16}}>Dados do Instrumento</ST>
-          <G3 mb={12}><FS l="Tipo *" v={form.tipo||""} s={v=>set("tipo",v)} opts={tiposInstr}/><F l="Fabricante *" v={form.fabricante||""} s={v=>set("fabricante",v)} ph="Ex: FLIR"/><F l="Modelo *" v={form.modelo||""} s={v=>set("modelo",v)} ph="Ex: E8-XT"/></G3>
+          <G3 mb={12}><FDL l="Tipo *" v={form.tipo||""} s={v=>set("tipo",v)} opts={tiposInstr} id="dl-tipo-instrumento"/><F l="Fabricante *" v={form.fabricante||""} s={v=>set("fabricante",v)} ph="Ex: FLIR"/><F l="Modelo *" v={form.modelo||""} s={v=>set("modelo",v)} ph="Ex: E8-XT"/></G3>
           <G3 mb={0}><F l="Nº de Série" v={form.serie||""} s={v=>set("serie",v)} ph="Ex: 639114962XT"/><F l="TAG / Identificação" v={form.tag||""} s={v=>set("tag",v)} ph="Ex: CAM-01"/><F l="Data de Calibração" t="date" v={form.calibracao||""} s={v=>set("calibracao",v)}/></G3>
           <div style={{display:"flex",gap:8,marginTop:16}}>
             <Btn success onClick={()=>{if(!form.tipo||!form.fabricante||!form.modelo){alert("Preencha tipo, fabricante e modelo");return;}onSave(form);setForm(null);}}>✅ Salvar</Btn>
@@ -2657,6 +2705,15 @@ function F({l,v,s,t="text",ph,readonly}){
 }
 function FS({l,v,s,opts}){
   return <div><label>{l}</label><select value={v} onChange={e=>s(e.target.value)}><option value="">Selecione...</option>{opts.map(o=><option key={o} value={o}>{o}</option>)}</select></div>;
+}
+// Igual ao F (texto livre), mas com sugestões via <datalist> — permite digitar qualquer valor
+// que não esteja na lista de opções (ex: Tipo de Instrumento), sem travar em opções fixas.
+function FDL({l,v,s,opts,id}){
+  return <div>
+    <label>{l}</label>
+    <input list={id} value={v} placeholder="Selecione ou digite..." onChange={e=>s(e.target.value)}/>
+    <datalist id={id}>{opts.map(o=><option key={o} value={o}/>)}</datalist>
+  </div>;
 }
 // Seletor de Tipo de Equipamento/Ponto de Medição agrupado por "grupo", lendo do cadastro de Critérios
 // (substitui o antigo <FS opts={TIPOS}/> fixo). Só lista critérios ativos.
