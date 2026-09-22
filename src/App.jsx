@@ -726,15 +726,17 @@ export default function App() {
           title={driveMeta.ownerEmail ? `Banco de dados sincronizado com: ${driveMeta.ownerEmail}` : "Nenhuma conta do Drive sincronizada neste dispositivo"}>
           📁 {driveMeta.ownerEmail || "Nenhuma conta sincronizada"}
         </span>
-        <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MENSAGEM)}`}
-          target="_blank" rel="noopener noreferrer"
-          style={{display:"flex",alignItems:"center",gap:4,padding:"7px 14px",borderRadius:6,background:T.greenStrong,color:T.white,fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>
-          🆘 Ajuda
-        </a>
-        <button onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} title={theme==="dark"?"Tema claro":"Tema escuro"}
-          style={{padding:"7px 14px",borderRadius:6,border:"1px solid "+T.borderMuted,background:"transparent",color:T.textDim,fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
-          {theme==="dark"?"☀️ Claro":"🌙 Escuro"}
-        </button>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          <a href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MENSAGEM)}`}
+            target="_blank" rel="noopener noreferrer"
+            style={{display:"flex",alignItems:"center",gap:4,padding:"7px 14px",borderRadius:6,background:T.greenStrong,color:T.white,fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>
+            🆘 Ajuda
+          </a>
+          <button onClick={()=>setTheme(t=>t==="dark"?"light":"dark")} title={theme==="dark"?"Tema claro":"Tema escuro"}
+            style={{padding:"7px 14px",borderRadius:6,border:"1px solid "+T.borderMuted,background:"transparent",color:T.textDim,fontWeight:600,fontSize:13,fontFamily:"'Barlow',sans-serif",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+            {theme==="dark"?"☀️ Claro":"🌙 Escuro"}
+          </button>
+        </div>
       </footer>
 
       <style>{`
@@ -787,7 +789,7 @@ const SEV_PDF = [
 function buildPizzaSVG(counts,total) {
   if(!total||total===0) return "";
   const data=SEV_PDF.map(s=>({l:s.l,v:counts[s.k]||0,c:s.c})).filter(d=>d.v>0);
-  const cx=100,cy=100,r=82;
+  const cx=100,cy=100,r=82; // viewBox/paths ficam no mesmo raio 0-200; o SVG é escalado menor via width/height abaixo
   let svgPaths="";
   if(data.length===1) {
     // Círculo sólido para caso de 100%
@@ -803,10 +805,10 @@ function buildPizzaSVG(counts,total) {
       return '<path d="M'+cx+','+cy+' L'+x1+','+y1+' A'+r+','+r+' 0 '+large+',1 '+x2+','+y2+' Z" fill="'+d.c+'" stroke="#fff" stroke-width="2"/>';
     }).join("");
   }
-  const svg='<svg viewBox="0 0 200 200" style="width:180px;height:180px;flex-shrink:0;">'+svgPaths+'<circle cx="'+cx+'" cy="'+cy+'" r="24" fill="#f8fafc"/><text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#111" font-size="18" font-weight="800" font-family="Arial">'+total+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#6b7280" font-size="8" font-family="Arial">TOTAL</text></svg>';
+  const svg='<svg viewBox="0 0 200 200" style="width:132px;height:132px;flex-shrink:0;">'+svgPaths+'<circle cx="'+cx+'" cy="'+cy+'" r="24" fill="#f8fafc"/><text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#111" font-size="18" font-weight="800" font-family="Arial">'+total+'</text><text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" fill="#6b7280" font-size="8" font-family="Arial">TOTAL</text></svg>';
   const rows=SEV_PDF.map(s=>({l:s.l,v:counts[s.k]||0,c:s.c})).filter(s=>s.v>0)
-    .map(function(s){return '<div style="display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid #f0f0f0;"><div style="width:16px;height:16px;border-radius:50%;background:'+s.c+';flex-shrink:0;"></div><div style="flex:1;font-size:15px;color:#374151;font-weight:600;">'+s.l+'</div><div style="font-size:22px;font-weight:800;color:'+s.c+';">'+s.v+'</div><div style="font-size:14px;color:#9ca3af;width:44px;text-align:right;">'+Math.round(s.v/total*100)+'%</div></div>';}).join("");
-  return '<div style="margin:16px 36px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:20px 28px;display:flex;align-items:center;gap:32px;flex-wrap:wrap;"><div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:-4px;">Distribuição por Severidade</div>'+svg+'<div style="display:flex;flex-direction:column;gap:4px;flex:1;">'+rows+'</div></div>';
+    .map(function(s){return '<div style="display:flex;align-items:center;gap:10px;padding:4px 0;border-bottom:1px solid #f0f0f0;"><div style="width:13px;height:13px;border-radius:50%;background:'+s.c+';flex-shrink:0;"></div><div style="flex:1;font-size:13px;color:#374151;font-weight:600;">'+s.l+'</div><div style="font-size:17px;font-weight:800;color:'+s.c+';">'+s.v+'</div><div style="font-size:12px;color:#9ca3af;width:38px;text-align:right;">'+Math.round(s.v/total*100)+'%</div></div>';}).join("");
+  return '<div style="margin:12px 36px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:14px 24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;"><div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;width:100%;margin-bottom:-2px;">Distribuição por Severidade</div>'+svg+'<div style="display:flex;flex-direction:column;gap:2px;flex:1;">'+rows+'</div></div>';
 }
 
 // Legenda de classificação: nível de severidade → prioridade/ação recomendada → significado, em linguagem
