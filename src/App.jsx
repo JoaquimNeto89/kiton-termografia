@@ -2105,7 +2105,10 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
 
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const addPonto = () => setForm(f=>({...f,pontos:[...f.pontos,newPonto()]}));
-  const delPonto = id => setForm(f=>({...f,pontos:f.pontos.filter(p=>p.id!==id)}));
+  const delPonto = id => {
+    if (!confirm("Remover esta medição? Os dados preenchidos nela serão perdidos.")) return;
+    setForm(f=>({...f,pontos:f.pontos.filter(p=>p.id!==id)}));
+  };
 
   // Campos cuja alteração dispara o recálculo automático de severidade.
   // Qualquer outro campo (observações, defeito, recomendação...) não deve tocar
@@ -2172,16 +2175,21 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
 
   return (
     <div>
-      <div style={{display:"flex",marginBottom:24,borderRadius:10,overflow:"hidden",border:"1px solid "+T.border}}>
-        {STEPS.map((s,i)=>(
-          <div key={i} onClick={()=>setStep(i)} style={{flex:1,padding:"12px 16px",
-            background:step===i?T.accent:T.panel,cursor:"pointer",
-            borderRight:i<1?"1px solid "+T.border:"none",
-            display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-            <span style={{fontSize:12,fontWeight:700,color:step===i?T.white:T.textFaint,textAlign:"center"}}>{s}</span>
-            {i<step && <span style={{fontSize:12,color:T.green}}>✓</span>}
+      <div style={{position:"sticky",top:60,zIndex:90,background:T.bg,paddingTop:8,paddingBottom:8,marginBottom:16}}>
+        <div style={{display:"flex",gap:8,alignItems:"stretch"}}>
+          <div style={{flex:1,display:"flex",borderRadius:10,overflow:"hidden",border:"1px solid "+T.border}}>
+            {STEPS.map((s,i)=>(
+              <div key={i} onClick={()=>setStep(i)} style={{flex:1,padding:"9px 14px",
+                background:step===i?T.accent:T.panel,cursor:"pointer",
+                borderRight:i<1?"1px solid "+T.border:"none",
+                display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <span style={{fontSize:12,fontWeight:700,color:step===i?T.white:T.textFaint,textAlign:"center"}}>{s}</span>
+                {i<step && <span style={{fontSize:12,color:T.green}}>✓</span>}
+              </div>
+            ))}
           </div>
-        ))}
+          <Btn onClick={()=>onSave(form)} success style={{flexShrink:0}}>✅ Salvar Relatório</Btn>
+        </div>
       </div>
 
       <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:"20px 16px"}}>
