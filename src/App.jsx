@@ -33,14 +33,16 @@ const DARK_THEME = {
   amber: "#f59e0b", amberBright: "#fbbf24",
   blue: "#60a5fa", blueBorder: "#3b82f6", blueStrong: "#2563eb",
   violet: "#a78bfa", violetBorder: "#7c3aed", indigo: "#818cf8", indigoBorder: "#6366f1", cyan: "#22d3ee", cyanBorder: "#0891b2",
-  // Escala de severidade de 5 níveis (CFCA: Normal → Suspeita de Falha → Falha Provável → Falha Certa → Falha Iminente).
+  // Escala de severidade de 5 níveis (CFCA). Rótulos usam a coluna "Prioridade/Classificação" do
+  // documento CFCA (curtos, cabem em badge/dashboard), não a "Diagnóstico" (essa fica só na Legenda
+  // de Classificação e no painel de info do ponto, ver CFCA_NIVEIS.nivel) — decisão do usuário.
   // Cores validadas para contraste (WCAG) contra o fundo do badge e da página nos dois temas — ver nota de implementação.
   sev: {
-    normal:   { label: "Normal",            color: "#22c55e", bg: "#052e16", border: "#14532d", icon: "🟢" },
-    suspeita: { label: "Suspeita de Falha",  color: "#f59e0b", bg: "#2d1f00", border: "#78350f", icon: "🟡" },
-    provavel: { label: "Falha Provável",     color: "#fb923c", bg: "#431407", border: "#9a3412", icon: "🟠" },
-    certa:    { label: "Falha Certa",        color: "#ef4444", bg: "#3b0a0a", border: "#7f1d1d", icon: "🔴" },
-    iminente: { label: "Falha Iminente",     color: "#e879f9", bg: "#4a044e", border: "#86198f", icon: "🟣" },
+    normal:   { label: "Normal",                   color: "#22c55e", bg: "#052e16", border: "#14532d", icon: "🟢" },
+    suspeita: { label: "Alerta",                    color: "#f59e0b", bg: "#2d1f00", border: "#78350f", icon: "🟡" },
+    provavel: { label: "Intervenção Programada",    color: "#fb923c", bg: "#431407", border: "#9a3412", icon: "🟠" },
+    certa:    { label: "Intervenção Imediata",      color: "#ef4444", bg: "#3b0a0a", border: "#7f1d1d", icon: "🔴" },
+    iminente: { label: "Crítico",                   color: "#e879f9", bg: "#4a044e", border: "#86198f", icon: "🟣" },
   },
 };
 
@@ -58,35 +60,50 @@ const LIGHT_THEME = {
   violet: "#7c3aed", violetBorder: "#7c3aed", indigo: "#4f46e5", indigoBorder: "#4f46e5", cyan: "#0e7490", cyanBorder: "#0e7490",
   sev: {
     normal:   { label: "Normal",            color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", icon: "🟢" },
-    suspeita: { label: "Suspeita de Falha",  color: "#b45309", bg: "#fffbeb", border: "#fde68a", icon: "🟡" },
-    provavel: { label: "Falha Provável",     color: "#c2410c", bg: "#fff7ed", border: "#fed7aa", icon: "🟠" },
-    certa:    { label: "Falha Certa",        color: "#dc2626", bg: "#fef2f2", border: "#fecaca", icon: "🔴" },
-    iminente: { label: "Falha Iminente",     color: "#a21caf", bg: "#fdf4ff", border: "#f0abfc", icon: "🟣" },
+    suspeita: { label: "Alerta",                    color: "#b45309", bg: "#fffbeb", border: "#fde68a", icon: "🟡" },
+    provavel: { label: "Intervenção Programada",    color: "#c2410c", bg: "#fff7ed", border: "#fed7aa", icon: "🟠" },
+    certa:    { label: "Intervenção Imediata",      color: "#dc2626", bg: "#fef2f2", border: "#fecaca", icon: "🔴" },
+    iminente: { label: "Crítico",                   color: "#a21caf", bg: "#fdf4ff", border: "#f0abfc", icon: "🟣" },
   },
 };
 
 // ─── CFCA (Critério de Classificação de Componentes Aquecidos) ─────────────
 // Razão AC/MAA, onde MAA = MTA - Ta. As 5 faixas mapeiam 1:1 para os 5 níveis de severidade do app.
 // Fonte: CFCA — Critério de Classificação de Componentes Aquecidos (Proposição ICON / Norma Petrobras
-// N-2475; referência MIL-STD-2194 SH) — faixas e rótulos de prioridade conforme documento de referência.
+// N-2475; referência MIL-STD-2194 SH) — tabela de Nível/Diagnóstico/Classificação/P.R.I. e texto de
+// "Interpretação dos níveis" conforme documento unificado de referência (substitui a versão anterior,
+// que divergia entre dois documentos parciais nos rótulos do nível 4 e 5).
 const CFCA_NIVEIS = [
-  { max: 0.3,  nivel: "Normal",             severidade: "normal",   prioridade: "Normal",                 significado: "Nenhum problema encontrado" },
-  { max: 0.6,  nivel: "Suspeita de Falha",  severidade: "suspeita", prioridade: "Observação",              significado: "Anomalia leve — recomenda-se nova medição em curto prazo" },
-  { max: 0.9,  nivel: "Falha Provável",     severidade: "provavel", prioridade: "Intervenção Programada",  significado: "Anomalia relevante — programar intervenção corretiva" },
-  { max: 1.2,  nivel: "Falha Certa",        severidade: "certa",    prioridade: "Intervenção Imediata",    significado: "Falha caracterizada — intervir o quanto antes" },
-  { max: Infinity, nivel: "Falha Iminente", severidade: "iminente", prioridade: "Crítica",                 significado: "Risco iminente de falha — ação imediata" },
+  { max: 0.3,  nivel: "Normal",                    severidade: "normal",   prioridade: "Normal",                 pri: "Sem intervenção / rotina", significado: "Condição térmica compatível com a operação. Mantém-se apenas a rotina de inspeção periódica." },
+  { max: 0.6,  nivel: "Suspeita de Falha",         severidade: "suspeita", prioridade: "Alerta",                 pri: "Mensal",                    significado: "Aquecimento acima do esperado, porém sem severidade. Manter acompanhamento com reinspeção mensal para verificar evolução." },
+  { max: 0.9,  nivel: "Falha Provável",            severidade: "provavel", prioridade: "Intervenção Programada", pri: "Até 21 dias",                significado: "Evidência consistente de degradação (mau contato, aperto insuficiente, oxidação, desequilíbrio ou sobrecarga). Correção em até 21 dias, podendo ser incorporada à próxima parada." },
+  { max: 1.2,  nivel: "Falha Potencial / Certa",   severidade: "certa",    prioridade: "Intervenção Imediata",   pri: "Até 14 dias",                significado: "Componente opera muito próximo do seu limite térmico. A falha é considerada certa se a condição persistir; deve ser programada parada corretiva em até 14 dias." },
+  { max: Infinity, nivel: "Falha Iminente",        severidade: "iminente", prioridade: "Crítico",                pri: "Até 7 dias",                 significado: "Acréscimo medido ultrapassou o limite admissível do componente. Risco de falha iminente, com possibilidade de interrupção não programada, dano a equipamentos adjacentes e risco à segurança. Requer avaliação da necessidade de desligamento imediato ou redução de carga." },
 ];
 const classificaCFCA = razao => CFCA_NIVEIS.find(f => razao < f.max) || CFCA_NIVEIS[CFCA_NIVEIS.length-1];
 
 // Calcula severidade + metadados a partir do ponto e do critério cadastrado (já resolvido, não pelo nome).
 // Retorna {severidade, severidadeAuto, cfca} — nunca sobrescreve se o técnico marcou manual (severidadeAuto:false já setado por quem chama).
+// Resolve o MTA efetivo de um ponto: se o tipo de equipamento tem subtipos cadastrados (MTA_SUBTIPOS —
+// ex. Transformador, Subestação, Cabo/Conexão), exige o Subtipo selecionado no ponto e usa o MTA fixo
+// dele, SEM cair de volta pro crit.mta (que fica em branco de propósito nesses tipos, pra não haver dois
+// valores conflitantes). Tipos sem lista de subtipos (ex. Barramento) usam o MTA cadastrado direto no
+// critério.
+function resolveMta(ponto, criterio) {
+  const subtipos = MTA_SUBTIPOS[criterio?.nome];
+  if (subtipos) {
+    const s = subtipos.find(x => x.subtipo === ponto.subtipoEquip);
+    return s ? s.mta : NaN;
+  }
+  return parseFloat(criterio?.mta);
+}
 function calcSeveridade(ponto, criterio) {
   const tMax = parseFloat(ponto.tempMax), tAmb = parseFloat(ponto.tempAmb);
   if (!criterio) {
     return { severidade: ponto.severidade || "normal", severidadeAuto: false, cfca: null };
   }
   if (criterio.metodo === "maa") {
-    const mta = parseFloat(criterio.mta);
+    const mta = resolveMta(ponto, criterio);
     if (isNaN(tMax) || isNaN(tAmb) || isNaN(mta)) {
       return { severidade: ponto.severidade || "normal", severidadeAuto: false, cfca: null };
     }
@@ -97,7 +114,7 @@ function calcSeveridade(ponto, criterio) {
     const c = classificaCFCA(razao);
     return {
       severidade: c.severidade, severidadeAuto: true,
-      cfca: { razao: razao.toFixed(2), ac: ac.toFixed(1), maa: maa.toFixed(1), mta, nivel: c.nivel, prioridade: c.prioridade, significado: c.significado },
+      cfca: { razao: razao.toFixed(2), ac: ac.toFixed(1), maa: maa.toFixed(1), mta, nivel: c.nivel, prioridade: c.prioridade, pri: c.pri, significado: c.significado },
     };
   }
   if (criterio.metodo === "comparativo") {
@@ -140,7 +157,7 @@ const fmtRelTime = ts => {
 const newPonto = () => ({
   id: Date.now()+Math.random(),
   dataMedicao: "", horaMedicao: "",
-  tag: "", equipamento: "", tipoEquip: "", localizacao: "", codigoArea: "",
+  tag: "", equipamento: "", tipoEquip: "", subtipoEquip: "", localizacao: "", codigoArea: "",
   periodicidade: "",
   tipoInstalacao: "", statusOperacao: "",
   emissividade: "0.95", transmissao: "1.00",
@@ -168,23 +185,58 @@ const INITIAL = {
 // Métodos com MTA definível (temperatura elétrica limite de projeto/placa) — candidatos naturais ao
 // MAA/CFCA. Os demais tipos legados seguem no método "comparativo" (compara com elemento similar/fase
 // adjacente), inclusive Motor Elétrico (mancais), cujo baseline é definido manualmente pelo técnico.
-const TIPOS_MAA_POR_PADRAO = ["Transformador","Subestação"];
+// Barramento e Cabo/Conexão entraram nessa lista depois que o usuário confirmou os valores de MTA da
+// tabela de referência (mesma fonte do CFCA) pra esses dois tipos.
+const TIPOS_MAA_POR_PADRAO = ["Transformador","Subestação","Barramento","Cabo/Conexão"];
 // Fonte normativa do próprio método MAA/CFCA (a fórmula e as 5 faixas), confirmada pelo documento
 // "Critério de Classificação de Componentes Aquecidos — Proposição ICON / Norma Petrobras N-2475
 // (referência MIL-STD-2194 SH)". Isto é diferente do MTA de cada equipamento (que é específico de
 // placa/documentação técnica de cada unidade e continua em branco, dependendo do técnico).
 const FONTE_CFCA = "CFCA — Critério de Classificação de Componentes Aquecidos (Proposição ICON / Norma Petrobras N-2475; referência MIL-STD-2194 SH)";
+// Tabela de MTA (Máxima Temperatura Admissível, °C) por subtipo de componente — para tipos de
+// equipamento que têm mais de um valor possível de MTA dependendo do subtipo/classe física (um único
+// campo MTA no critério seria impreciso: ex. Transformador a óleo = 80°C no corpo, mas Transformador
+// seco classe 180 = 140°C, quase o dobro). O técnico escolhe o Subtipo no ponto de medição, e o MTA é
+// resolvido automaticamente daqui — sem alterar o Tipo de Equipamento selecionado nem quebrar
+// relatórios antigos. Fonte: mesma tabela de referência do CFCA (confirmada pelo usuário).
+const MTA_SUBTIPOS = {
+  "Transformador": [
+    { subtipo: "A Óleo — Corpo", mta: 80 },
+    { subtipo: "A Óleo — Conexões", mta: 90 },
+    { subtipo: "Seco — Classe de Isolação 105", mta: 65 },
+    { subtipo: "Seco — Classe de Isolação 130", mta: 90 },
+    { subtipo: "Seco — Classe de Isolação 155", mta: 115 },
+    { subtipo: "Seco — Classe de Isolação 180", mta: 140 },
+  ],
+  "Subestação": [
+    { subtipo: "Seccionadora", mta: 50 },
+    { subtipo: "Conexão", mta: 60 },
+    { subtipo: "Cabo", mta: 60 },
+  ],
+  "Cabo/Conexão": [
+    { subtipo: "Cabo Isolado até 15 kV", mta: 70 },
+    { subtipo: "Conexão Mediante Parafusos", mta: 90 },
+    { subtipo: "Conexão Recoberta de Prata ou Níquel", mta: 90 },
+    { subtipo: "Conexão de Linha de Transmissão Aérea", mta: 70 },
+    { subtipo: "Régua de Bornes", mta: 70 },
+    { subtipo: "Fusível (Corpo)", mta: 100 },
+  ],
+};
+// MTA fixo (sem subtipo) pra tipos que têm só um valor aplicável na tabela de referência.
+const MTA_FIXO_POR_TIPO = { "Barramento": 90 };
 // Migração/semente: transforma os 10 tipos fixos antigos (objeto NBR) em critérios cadastrados.
 // Os valores de ΔT (alerta/crítico) são preservados exatamente como estavam — nenhum número novo é
 // inventado aqui. Método reclassificado por tipo de equipamento (ver TIPOS_MAA_POR_PADRAO). MTA fica
-// em branco — é específico de cada equipamento, depende de validação técnica humana.
+// em branco pra tipos que dependem de Subtipo (ver MTA_SUBTIPOS, resolvido no ponto de medição) ou de
+// validação técnica humana; entra já preenchido só quando há um único valor aplicável (MTA_FIXO_POR_TIPO).
 const seedCriteriosFromNBR = () => Object.entries(NBR).map(([tipo,c]) => {
   const isMaa = TIPOS_MAA_POR_PADRAO.includes(tipo);
   return {
     id: "seed-"+tipo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-"),
     nome: tipo, grupo: tipo, metodo: isMaa ? "maa" : "comparativo",
     oQueComparado: c.ref, condicoes: "",
-    mta: "", toleranciaAlerta: c.alerta, toleranciaCritico: c.critico,
+    mta: (isMaa && MTA_FIXO_POR_TIPO[tipo]) ? String(MTA_FIXO_POR_TIPO[tipo]) : "",
+    toleranciaAlerta: c.alerta, toleranciaCritico: c.critico,
     documentacaoNecessaria: "",
     fonteNormativa: isMaa ? FONTE_CFCA : "", statusFonte: isMaa ? "verificado" : "interno", ativo: true,
   };
@@ -208,11 +260,15 @@ const migraSeveridade5Niveis = relatorios => (relatorios||[]).map(r => ({
 // manualmente, a migração não sobrescreve, para não apagar uma decisão humana.
 const migraCriteriosSeedParaMAA = criterios => (criterios||[]).map(c => {
   const idSeedDe = t => "seed-"+t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-");
-  if (!TIPOS_MAA_POR_PADRAO.some(t => c.id === idSeedDe(t))) return c;
+  const tipoSeed = TIPOS_MAA_POR_PADRAO.find(t => c.id === idSeedDe(t));
+  if (!tipoSeed) return c;
   let u = c;
   if (u.metodo === "comparativo") u = { ...u, metodo: "maa" };
   if (u.metodo === "maa" && !u.fonteNormativa && (!u.statusFonte || u.statusFonte==="interno")) {
     u = { ...u, fonteNormativa: FONTE_CFCA, statusFonte: "verificado" };
+  }
+  if (u.metodo === "maa" && !u.mta && MTA_FIXO_POR_TIPO[tipoSeed]) {
+    u = { ...u, mta: String(MTA_FIXO_POR_TIPO[tipoSeed]) };
   }
   return u;
 });
@@ -722,11 +778,11 @@ export default function App() {
 // ─── EXPORT PDF ───────────────────────────────────────────────────────────────
 // Paleta de severidade (5 níveis) para o PDF — sempre em fundo claro, validada para contraste.
 const SEV_PDF = [
-  { k:"iminente", l:"Falha Iminente", c:"#a21caf", bg:"#fdf4ff" },
-  { k:"certa",    l:"Falha Certa",    c:"#dc2626", bg:"#fef2f2" },
-  { k:"provavel", l:"Falha Provável", c:"#c2410c", bg:"#fff7ed" },
-  { k:"suspeita", l:"Suspeita de Falha", c:"#b45309", bg:"#fffbeb" },
-  { k:"normal",   l:"Normal",         c:"#16a34a", bg:"#f0fdf4" },
+  { k:"iminente", l:"Crítico",                c:"#a21caf", bg:"#fdf4ff" },
+  { k:"certa",    l:"Intervenção Imediata",   c:"#dc2626", bg:"#fef2f2" },
+  { k:"provavel", l:"Intervenção Programada", c:"#c2410c", bg:"#fff7ed" },
+  { k:"suspeita", l:"Alerta",                 c:"#b45309", bg:"#fffbeb" },
+  { k:"normal",   l:"Normal",                 c:"#16a34a", bg:"#f0fdf4" },
 ];
 function buildPizzaSVG(counts,total) {
   if(!total||total===0) return "";
@@ -764,22 +820,56 @@ function buildLegendaSeveridade() {
       <td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:center;"><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${sp?.c||"#999"};"></span></td>
       <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;color:${sp?.c||"#374151"};">${n.nivel}</td>
       <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:600;">${n.prioridade}</td>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:600;white-space:nowrap;">${n.pri}</td>
       <td style="padding:6px 10px;border:1px solid #e5e7eb;color:#6b7280;">${n.significado}</td>
     </tr>`;
   }).join("");
   return `
-  <div style="padding:0 36px;margin-top:14px;">
-    <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Legenda de Classificação</div>
+  <div style="padding:0 36px;">
     <table style="width:100%;border-collapse:collapse;font-size:11px;">
       <thead><tr style="background:#1C2633;">
         <th style="padding:6px 10px;color:#fff;width:30px;"></th>
         <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">Nível</th>
         <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">Prioridade</th>
+        <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">P.R.I.</th>
         <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">Significado</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div style="font-size:9px;color:#9ca3af;margin-top:4px;">Nomenclatura de severidade/prioridade conforme CFCA — ${FONTE_CFCA.replace("CFCA — Critério de Classificação de Componentes Aquecidos ","")}</div>
+    <div style="font-size:9px;color:#9ca3af;margin-top:4px;">P.R.I. = Prazo Recomendável para Intervenção (pode ser antecipado conforme criticidade operacional do ativo, redundância e condições de acesso/segurança). Nível/P.R.I. conforme CFCA — ${FONTE_CFCA.replace("CFCA — Critério de Classificação de Componentes Aquecidos ","")} — Prioridade "Alerta" substitui o termo "Observação" do documento original, por preferência interna Kiton.</div>
+  </div>`;
+}
+
+// Glossário de siglas usadas/citadas no relatório. Expansão de AC/MAA confirmada pela legenda oficial do
+// documento CFCA (Proposição ICON / Norma Petrobras N-2475 / MIL-STD-2194 SH).
+function buildLegendaSiglas() {
+  const siglas = [
+    ["CFCA", "Critério de Classificação de Componentes Aquecidos — metodologia que classifica a severidade pela razão AC/MAA."],
+    ["MTA", "Máxima Temperatura Admissível do componente — valor de referência do equipamento (placa/documentação técnica), informado manualmente no cadastro do critério (ou por subtipo, quando aplicável)."],
+    ["Ta", "Temperatura ambiente no momento da inspeção."],
+    ["MAA", "Máximo Acréscimo Admissível — calculado automaticamente: MTA − Ta."],
+    ["AC", "Acréscimo de Temperatura medido — calculado automaticamente: T.Máx do ponto − Ta (no método MAA/CFCA)."],
+    ["P.R.I.", "Prazo Recomendável para Intervenção — prazo, em dias, associado ao nível de severidade (ver Legenda de Classificação)."],
+    ["ΔT", "Diferença de Temperatura — usada no método Comparativo: T.Máx do ponto − elemento de referência (fase/componente similar)."],
+    ["OS", "Ordem de Serviço."],
+    ["ART", "Anotação de Responsabilidade Técnica."],
+    ["CREA", "Conselho Regional de Engenharia e Agronomia."],
+    ["TAG", "Identificação/etiqueta do equipamento ou ponto de medição."],
+  ];
+  const rows = siglas.map(([sigla,desc])=>`
+    <tr>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb;font-weight:700;white-space:nowrap;">${sigla}</td>
+      <td style="padding:6px 10px;border:1px solid #e5e7eb;color:#374151;">${desc}</td>
+    </tr>`).join("");
+  return `
+  <div style="padding:0 36px;">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead><tr style="background:#1C2633;">
+        <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;width:70px;">Sigla</th>
+        <th style="padding:6px 10px;color:#fff;text-align:left;font-size:10px;">Significado</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
   </div>`;
 }
 
@@ -813,18 +903,31 @@ function buildReportHTML(rel, todosRelatorios) {
   });
   const metodoLabel = m => m==="maa" ? "MAA/CFCA" : m==="qualitativo" ? "Qualitativo" : "Comparativo";
   const criterioResumo = c => {
-    if (c.metodo==="maa") return `MTA = ${c.mta||"—"}°C · severidade pela razão (T.máx−T.amb)/MAA`;
+    if (c.metodo==="maa") {
+      const subtipos = MTA_SUBTIPOS[c.nome];
+      if (subtipos) {
+        const usados = [...new Set(pontos.filter(p=>p.tipoEquip===c.nome).map(p=>p.subtipoEquip).filter(Boolean))];
+        return usados.length>0
+          ? `MTA por Subtipo: ${usados.map(u=>`${u} = ${subtipos.find(s=>s.subtipo===u)?.mta ?? "—"}°C`).join(" · ")} · severidade pela razão AC/MAA`
+          : "MTA definido por Subtipo do equipamento (ver ficha de cada ponto) · severidade pela razão AC/MAA";
+      }
+      return `MTA = ${c.mta||"—"}°C · severidade pela razão (T.máx−T.amb)/MAA`;
+    }
     if (c.metodo==="qualitativo") return c.documentacaoNecessaria ? `Classificação manual · ${c.documentacaoNecessaria}` : "Classificação manual pelo técnico";
     return (c.toleranciaAlerta!==""&&c.toleranciaAlerta!=null&&c.toleranciaCritico!==""&&c.toleranciaCritico!=null)
-      ? `🟡 Suspeita ≥${c.toleranciaAlerta}°C · 🔴 Certa ≥${c.toleranciaCritico}°C` : "Sem tolerância numérica — classificação manual";
+      ? `🟡 Alerta ≥${c.toleranciaAlerta}°C · 🔴 Interv. Imediata ≥${c.toleranciaCritico}°C` : "Sem tolerância numérica — classificação manual";
   };
-  // Numeração das seções da pág. 1: Identificação > Instrumentos (se houver) > Critérios (se houver) > Resumo
+  // Numeração das seções: Identificação > Instrumentos (se houver) > Critérios (se houver) > Resumo (pág. 1)
+  // > Legenda de Classificação > Legenda de Siglas (pág. 2, dedicada — evita estourar a pág. 1 quando há
+  // vários critérios/instrumentos cadastrados no relatório).
   const temInstrumentos = (rel.instrumentos||[]).length>0;
   let __secNum = 1;
   const numIdentificacao = __secNum++;
   const numInstrumentos = temInstrumentos ? __secNum++ : null;
   const numCriterios = criteriosUsados.length>0 ? __secNum++ : null;
   const numResumo = __secNum++;
+  const numLegenda = __secNum++;
+  const numSiglas = __secNum++;
 
   function header() { return `
   <div style="background:#ffffff;padding:16px 36px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #CD0000;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
@@ -850,9 +953,10 @@ function buildReportHTML(rel, todosRelatorios) {
 
   // Calcular total de páginas
   const numGruposIndice = Math.ceil(pontos.length / 20) || 1;
-  const totalPaginas = 1 + numGruposIndice + (pontos.length * 2) + 1;
-  // Página (absoluta, 1-indexada) onde começa a ficha do ponto i: capa + páginas de índice + fichas anteriores (2 cada) + 1
-  const paginaFichaDoPonto = i => 1 + numGruposIndice + i*2 + 1;
+  const PAGS_FIXAS_INICIO = 2; // capa (pág. 1) + legenda (pág. 2)
+  const totalPaginas = PAGS_FIXAS_INICIO + numGruposIndice + (pontos.length * 2) + 1;
+  // Página (absoluta, 1-indexada) onde começa a ficha do ponto i: capa+legenda + páginas de índice + fichas anteriores (2 cada) + 1
+  const paginaFichaDoPonto = i => PAGS_FIXAS_INICIO + numGruposIndice + i*2 + 1;
   let paginaAtual = 0;
   function footerPag() {
     paginaAtual++;
@@ -929,8 +1033,21 @@ function buildReportHTML(rel, todosRelatorios) {
       <td style="padding:12px 6px;border:1px solid #e5e7eb;text-align:center;background:${s.bg};"><div style="font-size:24px;font-weight:800;color:${s.c};">${sevCounts[s.k]}</div><div style="font-size:10px;color:${s.c};text-transform:uppercase;">${s.l}</div></td>`).join("")}
     </tr></tbody></table>
   </div>
-  ${buildLegendaSeveridade()}
   ${buildPizzaSVG(sevCounts,pontos.length)}
+  <div style="flex:1;min-height:20px;"></div>
+  ${footerPag()}
+</div>`;
+
+  // ── PÁGINA 2 — Legenda de Classificação + Legenda de Siglas ─────────────────
+  // Página própria (não gruda na pág. 1) justamente para não estourar a pág. 1 quando o relatório já tem
+  // vários critérios/instrumentos cadastrados — foi o que causava o rodapé sobrepondo conteúdo.
+  const pageLegenda = `
+<div class="page">
+  ${header()}
+  ${sec(`${numLegenda}. Legenda de Classificação`)}
+  ${buildLegendaSeveridade()}
+  ${sec(`${numSiglas}. Legenda de Siglas`)}
+  ${buildLegendaSiglas()}
   <div style="flex:1;min-height:20px;"></div>
   ${footerPag()}
 </div>`;
@@ -1117,9 +1234,9 @@ ${footerPag()}
   ${header()}
   ${sec("Conclusões e Análise de Tendência")}
   <div style="padding:0 36px;">
-    ${sevCounts.iminente>0?`<div style="background:#fdf4ff;border:1px solid #f0abfc;border-left:4px solid #a21caf;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#a21caf;">🟣 FALHA IMINENTE — AÇÃO IMEDIATA</b><br/>Foram identificadas ${sevCounts.iminente} medição(ões) em Falha Iminente. Recomenda-se intervenção imediata, antes de qualquer outra prioridade deste relatório.</div>`:""}
-    ${sevCounts.certa>0?`<div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#dc2626;">⚠️ INTERVENÇÃO NECESSÁRIA</b><br/>Foram identificadas ${sevCounts.certa} medição(ões) em Falha Certa. Recomenda-se ação corretiva prioritária.</div>`:""}
-    ${sevCounts.provavel>0?`<div style="background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #c2410c;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#c2410c;">🟠 INTERVENÇÃO PROGRAMADA</b><br/>Foram identificadas ${sevCounts.provavel} medição(ões) em Falha Provável. Recomenda-se programar a intervenção.</div>`:""}
+    ${sevCounts.iminente>0?`<div style="background:#fdf4ff;border:1px solid #f0abfc;border-left:4px solid #a21caf;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#a21caf;">🟣 CRÍTICO — AÇÃO IMEDIATA</b><br/>Foram identificadas ${sevCounts.iminente} medição(ões) em nível Crítico. Recomenda-se intervenção imediata, antes de qualquer outra prioridade deste relatório.</div>`:""}
+    ${sevCounts.certa>0?`<div style="background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#dc2626;">⚠️ INTERVENÇÃO NECESSÁRIA</b><br/>Foram identificadas ${sevCounts.certa} medição(ões) em Intervenção Imediata. Recomenda-se ação corretiva prioritária.</div>`:""}
+    ${sevCounts.provavel>0?`<div style="background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #c2410c;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#c2410c;">🟠 INTERVENÇÃO PROGRAMADA</b><br/>Foram identificadas ${sevCounts.provavel} medição(ões) em Intervenção Programada. Recomenda-se programar a intervenção.</div>`:""}
     ${sevCounts.suspeita>0?`<div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #b45309;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#b45309;">🟡 OBSERVAÇÃO RECOMENDADA</b><br/>Foram identificadas ${sevCounts.suspeita} medição(ões) com suspeita de falha. Recomenda-se nova medição em curto prazo.</div>`:""}
     ${(sevCounts.iminente+sevCounts.certa+sevCounts.provavel+sevCounts.suspeita)===0?`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #16a34a;border-radius:6px;padding:12px 16px;margin-bottom:10px;font-size:12px;color:#374151;"><b style="color:#16a34a;">✅ INSTALAÇÃO EM CONDIÇÕES NORMAIS</b><br/>Nenhuma anomalia identificada. Manter monitoramento conforme periodicidade estabelecida.</div>`:""}
   </div>
@@ -1205,6 +1322,7 @@ ${footerPag()}
 </head>
 <body>
 ${page1}
+${pageLegenda}
 ${pageIndice}
 ${pagesMedicao}
 ${pageUltima}
@@ -1294,11 +1412,11 @@ function exportJPG(rel, todosRelatorios) {
 function PizzaChart({ counts={}, total }) {
   if (!total || total === 0) return null;
   const SEV5 = [
-    { key:"iminente", label:"Falha Iminente",    color:"#e879f9" },
-    { key:"certa",    label:"Falha Certa",       color:"#ef4444" },
-    { key:"provavel", label:"Falha Provável",    color:"#fb923c" },
-    { key:"suspeita", label:"Suspeita de Falha", color:"#f59e0b" },
-    { key:"normal",   label:"Normal",            color:"#22c55e" },
+    { key:"iminente", label:"Crítico",                color:"#e879f9" },
+    { key:"certa",    label:"Intervenção Imediata",   color:"#ef4444" },
+    { key:"provavel", label:"Intervenção Programada", color:"#fb923c" },
+    { key:"suspeita", label:"Alerta",                 color:"#f59e0b" },
+    { key:"normal",   label:"Normal",                 color:"#22c55e" },
   ];
   const data = SEV5.map(s=>({label:s.label,val:counts[s.key]||0,color:s.color})).filter(d=>d.val>0);
   if (data.length===0) return null;
@@ -1521,7 +1639,15 @@ function CadCriterios({ items, onSave, onDelete }) {
             <F l="Grupo *" v={form.grupo||""} s={v=>set("grupo",v)} ph="Ex: Motor Elétrico"/>
             <FS l="Método de Avaliação *" v={METODOS.find(m=>m.v===form.metodo)?.l||""} s={l=>set("metodo",(METODOS.find(m=>m.l===l)||{}).v||"comparativo")} opts={METODOS.map(m=>m.l)}/>
           </G3>
-          {form.metodo==="maa" && (
+          {form.metodo==="maa" && MTA_SUBTIPOS[form.nome] && (
+            <div style={{marginBottom:12,background:T.panelInfo,border:"1px solid "+T.borderInfo,borderRadius:6,padding:"10px 14px",fontSize:12,color:T.textDim}}>
+              <b style={{color:T.blue}}>MTA definido por Subtipo, não aqui:</b> este tipo tem mais de um valor de MTA possível, então o técnico escolhe o Subtipo na hora de registrar o ponto de medição, e o MTA é resolvido automaticamente. Valores cadastrados:
+              <div style={{marginTop:6,display:"flex",flexDirection:"column",gap:2}}>
+                {MTA_SUBTIPOS[form.nome].map(s=><span key={s.subtipo}>• {s.subtipo}: {s.mta}°C</span>)}
+              </div>
+            </div>
+          )}
+          {form.metodo==="maa" && !MTA_SUBTIPOS[form.nome] && (
             <G3 mb={12}>
               <F l="MTA — Máxima Temperatura Admissível (°C) *" t="number" v={form.mta||""} s={v=>set("mta",v)} ph="Ex: 90"/>
               <div style={{gridColumn:"span 2",fontSize:12,color:T.textFaint,alignSelf:"end",paddingBottom:8}}>
@@ -1531,8 +1657,8 @@ function CadCriterios({ items, onSave, onDelete }) {
           )}
           {form.metodo==="comparativo" && (
             <G3 mb={12}>
-              <F l="ΔT Suspeita de Falha (°C) *" t="number" v={form.toleranciaAlerta||""} s={v=>set("toleranciaAlerta",v)} ph="Ex: 10"/>
-              <F l="ΔT Falha Certa (°C) *" t="number" v={form.toleranciaCritico||""} s={v=>set("toleranciaCritico",v)} ph="Ex: 20"/>
+              <F l="ΔT Alerta (°C) *" t="number" v={form.toleranciaAlerta||""} s={v=>set("toleranciaAlerta",v)} ph="Ex: 10"/>
+              <F l="ΔT Intervenção Imediata (°C) *" t="number" v={form.toleranciaCritico||""} s={v=>set("toleranciaCritico",v)} ph="Ex: 20"/>
               <F l="O que é comparado (referência)" v={form.oQueComparado||""} s={v=>set("oQueComparado",v)} ph="Ex: Fase adjacente / mancal similar / leitura anterior do mesmo ponto"/>
             </G3>
           )}
@@ -1561,8 +1687,8 @@ function CadCriterios({ items, onSave, onDelete }) {
           <div style={{display:"flex",gap:8,marginTop:16}}>
             <Btn success onClick={()=>{
               if(!form.nome||!form.grupo){alert("Nome e Grupo são obrigatórios");return;}
-              if(form.metodo==="maa" && !form.mta){alert("Informe o MTA para o método MAA/CFCA");return;}
-              if(form.metodo==="comparativo" && (form.toleranciaAlerta===""||form.toleranciaCritico==="")){alert("Informe as tolerâncias de Suspeita de Falha e Falha Certa para o método Comparativo");return;}
+              if(form.metodo==="maa" && !MTA_SUBTIPOS[form.nome] && !form.mta){alert("Informe o MTA para o método MAA/CFCA");return;}
+              if(form.metodo==="comparativo" && (form.toleranciaAlerta===""||form.toleranciaCritico==="")){alert("Informe as tolerâncias de Alerta e Intervenção Imediata para o método Comparativo");return;}
               onSave(form);setForm(null);
             }}>✅ Salvar</Btn>
             <Btn onClick={()=>setForm(null)}>Cancelar</Btn>
@@ -1598,8 +1724,8 @@ function CadCriterios({ items, onSave, onDelete }) {
                       </div>
                       <div style={{fontWeight:700,color:T.textBright}}>{item.nome}</div>
                       <div style={{fontSize:12,color:T.textFaint,marginTop:2}}>
-                        {item.metodo==="maa" && `MTA: ${item.mta||"—"}°C`}
-                        {item.metodo==="comparativo" && `Suspeita ≥ ${item.toleranciaAlerta||"—"}°C · Certa ≥ ${item.toleranciaCritico||"—"}°C`}
+                        {item.metodo==="maa" && (MTA_SUBTIPOS[item.nome] ? `MTA por Subtipo (${MTA_SUBTIPOS[item.nome].length} opções, ${Math.min(...MTA_SUBTIPOS[item.nome].map(s=>s.mta))}–${Math.max(...MTA_SUBTIPOS[item.nome].map(s=>s.mta))}°C)` : `MTA: ${item.mta||"—"}°C`)}
+                        {item.metodo==="comparativo" && `Alerta ≥ ${item.toleranciaAlerta||"—"}°C · Interv. Imediata ≥ ${item.toleranciaCritico||"—"}°C`}
                         {item.metodo==="qualitativo" && "Classificação manual"}
                         {item.fonteNormativa && ` · ${item.fonteNormativa}`}
                       </div>
@@ -1914,7 +2040,7 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
   // Campos cuja alteração dispara o recálculo automático de severidade.
   // Qualquer outro campo (observações, defeito, recomendação...) não deve tocar
   // na severidade — evita apagar uma classificação manual do técnico ao editar algo não relacionado.
-  const SEVERIDADE_RECALC_FIELDS = ["tempMax","tempMin","tempRef","tempAmb","tipoEquip"];
+  const SEVERIDADE_RECALC_FIELDS = ["tempMax","tempMin","tempRef","tempAmb","tipoEquip","subtipoEquip"];
   // Fator de carga: calculado automaticamente quando há corrente nominal + ao menos uma fase medida
   // (usa a MAIOR corrente de fase, não a média — é o cenário mais conservador para avaliação térmica).
   // Sem essas correntes (equipamentos que não são Subestação/Transformador), o técnico digita manualmente.
@@ -1923,6 +2049,11 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
     ...f, pontos:(f.pontos||[]).map(p=>{
       if(p.id!==id) return p;
       let u={...p,[k]:v};
+      // Trocar o Tipo de Equipamento invalida o Subtipo anterior (lista de subtipos é específica de
+      // cada tipo — ex. os subtipos de Transformador não fazem sentido pra Subestação).
+      if (k==="tipoEquip" && !(MTA_SUBTIPOS[u.tipoEquip]||[]).some(s=>s.subtipo===u.subtipoEquip)) {
+        u.subtipoEquip = "";
+      }
       const critAtual = (cadastros.criterios||[]).find(c=>c.nome===u.tipoEquip && c.ativo!==false);
       u.tempMedia = calcMedia(u.tempMax,u.tempMin);
       // ΔT exibido acompanha a base que cada método realmente usa na severidade: MAA/CFCA calcula a
@@ -2069,7 +2200,7 @@ function FormRel({ initial, onSave, onCancel, cadastros={clientes:[],cameras:[],
                     <div key={c.id} style={{fontSize:11,color:T.textMuted}}>
                       <b style={{color:T.gray9ca}}>{c.nome}:</b>{" "}
                       {c.metodo==="maa"
-                        ? `MTA ${c.mta||"—"}°C (MAA/CFCA)`
+                        ? (MTA_SUBTIPOS[c.nome] ? `MTA por Subtipo (MAA/CFCA)` : `MTA ${c.mta||"—"}°C (MAA/CFCA)`)
                         : c.metodo==="qualitativo"
                         ? "qualitativo (manual)"
                         : (c.toleranciaAlerta!==""&&c.toleranciaCritico!=="") ? `🟡≥${c.toleranciaAlerta}°C · 🔴≥${c.toleranciaCritico}°C` : "sem tolerância (manual)"}
@@ -2190,6 +2321,11 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
         <TipoSelect l="Tipo de Equipamento" v={p.tipoEquip} s={v=>onChange("tipoEquip",v)} criterios={criterios}/>
         <FS l="Periodicidade" v={p.periodicidade||""} s={v=>onChange("periodicidade",v)} opts={periodOpts}/>
       </div>
+      {MTA_SUBTIPOS[p.tipoEquip] && (
+        <div style={{marginBottom:12}}>
+          <FS l={`Subtipo (define o MTA/CFCA de ${p.tipoEquip})`} v={p.subtipoEquip||""} s={v=>onChange("subtipoEquip",v)} opts={MTA_SUBTIPOS[p.tipoEquip].map(s=>s.subtipo)}/>
+        </div>
+      )}
       <G2 mb={12}>
         <F l="Localização / Área *" v={p.localizacao} s={v=>onChange("localizacao",v)} ph="Ex: Sala Elétrica Principal"/>
         <F l="Nome / Código de Área" v={p.codigoArea||""} s={v=>onChange("codigoArea",v)} ph="Ex: P1, Pintura"/>
@@ -2249,7 +2385,7 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
         {crit && !showTempRef && (
           <div style={{fontSize:11,color:T.textFaint,marginTop:6}}>
             {crit.metodo==="maa"
-              ? "Método MAA/CFCA: a severidade usa T. Máx (acima) + Temperatura Ambiente (em Condições) + MTA do critério. T. Referência não se aplica a este método."
+              ? `Método MAA/CFCA: a severidade usa T. Máx (acima) + Temperatura Ambiente (em Condições) + MTA${MTA_SUBTIPOS[p.tipoEquip]?" (definido pelo Subtipo, abaixo do Tipo de Equipamento)":" do critério"}. T. Referência não se aplica a este método.`
               : "Classificação qualitativa: T. Máx e T. Mín ficam registrados no relatório, mas não geram cálculo automático de severidade — o técnico classifica manualmente abaixo."}
           </div>
         )}
@@ -2284,14 +2420,16 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
         <div style={{marginBottom:12,background:T.panelInfo,border:"1px solid "+T.borderInfo,borderRadius:6,padding:"8px 12px",fontSize:11,color:T.textMuted}}>
           {crit.metodo==="maa" && (
             <>
-              <b style={{color:T.blue}}>Critério — {p.tipoEquip} (MAA/CFCA):</b> MTA = {crit.mta||"—"}°C
-              {p.cfca ? ` · MAA = ${p.cfca.maa}°C · Razão AC/MAA = ${p.cfca.razao} · ${p.cfca.nivel} (${p.cfca.prioridade})`
-                      : " · preencha T. Máx e T. Ambiente para calcular"}
+              <b style={{color:T.blue}}>Critério — {p.tipoEquip}{p.subtipoEquip?` · ${p.subtipoEquip}`:""} (MAA/CFCA):</b> MTA = {p.cfca?.mta ?? (MTA_SUBTIPOS[p.tipoEquip] ? "—" : (crit.mta||"—"))}°C
+              {p.cfca ? ` · MAA = ${p.cfca.maa}°C · Razão AC/MAA = ${p.cfca.razao} · ${p.cfca.nivel} (${p.cfca.prioridade}) · P.R.I.: ${p.cfca.pri}`
+                      : (MTA_SUBTIPOS[p.tipoEquip] && !p.subtipoEquip)
+                        ? " · selecione o Subtipo acima para calcular"
+                        : " · preencha T. Máx e T. Ambiente para calcular"}
             </>
           )}
           {crit.metodo==="comparativo" && (
             (crit.toleranciaAlerta!==""&&crit.toleranciaCritico!=="") ? (
-              <><b style={{color:T.blue}}>Critério — {p.tipoEquip}:</b> {crit.oQueComparado?`Ref. = ${crit.oQueComparado} · `:""}🟡 Suspeita ≥{crit.toleranciaAlerta}°C · 🔴 Certa ≥{crit.toleranciaCritico}°C</>
+              <><b style={{color:T.blue}}>Critério — {p.tipoEquip}:</b> {crit.oQueComparado?`Ref. = ${crit.oQueComparado} · `:""}🟡 Alerta ≥{crit.toleranciaAlerta}°C · 🔴 Interv. Imediata ≥{crit.toleranciaCritico}°C</>
             ) : (
               <><b style={{color:T.amber}}>Critério — {p.tipoEquip}:</b> sem tolerância numérica cadastrada — classifique a severidade manualmente.</>
             )
@@ -2407,7 +2545,7 @@ function Comparativo({ cliente, relatorios, onBack }) {
         <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
           <thead>
             <tr style={{background:T.panelDeep}}>
-              {["Inspeção","Data","Medições","🟢 Normais","🟡 Suspeitas","🟠 Prováveis","🔴 Certas","🟣 Iminentes","Maior ΔT"].map(h=>(
+              {["Inspeção","Data","Medições","🟢 Normais","🟡 Alertas","🟠 Programadas","🔴 Imediatas","🟣 Críticos","Maior ΔT"].map(h=>(
                 <th key={h} style={{padding:"11px 14px",textAlign:"left",fontSize:11,fontWeight:700,color:T.textMuted,letterSpacing:.8,textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr>
