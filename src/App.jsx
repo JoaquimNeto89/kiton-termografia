@@ -1234,7 +1234,13 @@ ${footerPag()}
 <div class="page">
   ${header()}
   <div style="padding:14px 36px 0;">
-    <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:700;color:#1C2633;">Medição #${i+1}${p.equipamento?" — "+p.equipamento:""} <span style="font-size:12px;font-weight:400;color:#6b7280;">(continuação)</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div style="font-family:'Oswald',sans-serif;font-size:18px;font-weight:700;color:#1C2633;">Medição #${i+1}${p.equipamento?" — "+p.equipamento:""} <span style="font-size:12px;font-weight:400;color:#6b7280;">(continuação)</span></div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px;">${[p.tipoEquip,p.localizacao,p.dataMedicao?("Medição: "+fd(p.dataMedicao)+(p.horaMedicao?" às "+p.horaMedicao:"")):null].filter(Boolean).join(" · ")}</div>
+      </div>
+      <span style="background:${sbg};color:${scolor};border:2px solid ${scolor};padding:5px 16px;border-radius:20px;font-weight:800;font-size:13px;font-family:'Oswald',sans-serif;">${slabel}</span>
+    </div>
   </div>
   ${sec("Diagnóstico e Ações")}
   <div style="padding:0 36px;display:flex;flex-direction:column;gap:10px;">
@@ -2379,11 +2385,16 @@ function PontoCard({ p, idx, onChange, onRemove, onFoto, canRemove, clienteNome=
 
       {/* Identificação — com lista do cliente se disponível */}
       {equipsCliente.length > 0 && (() => {
-        // Reflete no próprio select qual equipamento cadastrado já está preenchido no ponto (por tag+nome+tipo) —
-        // sem isso o select sempre voltava em branco (defaultValue) mesmo com os campos já preenchidos, o que
-        // acontecia sempre que o ponto vinha de outro lugar já preenchido (clonagem de relatório, por exemplo).
+        // Reflete no próprio select qual equipamento cadastrado já está preenchido no ponto (por
+        // tag+nome+tipo+localização+área) — sem isso o select sempre voltava em branco (defaultValue)
+        // mesmo com os campos já preenchidos, o que acontecia sempre que o ponto vinha de outro lugar
+        // já preenchido (clonagem de relatório, por exemplo). IMPORTANTE: localização/área entram na
+        // comparação porque um mesmo equipamento (mesma tag+nome+tipo) pode ter várias entradas
+        // cadastradas só diferindo nisso (ex.: "Estufa 01" com Porta Entrada e Porta Saída) — comparar
+        // só tag+nome+tipo sempre "colava" no primeiro item da lista, mesmo depois de selecionar outro.
         const equipAtualId = equipsCliente.find(eq =>
-          (eq.tag||"") === (p.tag||"") && (eq.nome||"") === (p.equipamento||"") && (eq.tipo||"") === (p.tipoEquip||"")
+          (eq.tag||"") === (p.tag||"") && (eq.nome||"") === (p.equipamento||"") && (eq.tipo||"") === (p.tipoEquip||"") &&
+          (eq.localizacao||"") === (p.localizacao||"") && (eq.codigoArea||"") === (p.codigoArea||"")
         )?.id || "";
         return (
         <div style={{marginBottom:12,background:T.panelInfo,border:"1px solid "+T.borderInfo,borderRadius:7,padding:"10px 14px"}}>
