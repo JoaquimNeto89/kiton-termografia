@@ -1605,6 +1605,7 @@ function CadClientes({ items, onSave, onDelete, criterios=[] }) {
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <span style={{fontSize:12,color:T.textFaint}}>{expanded===item.id?"▲":"▼"}</span>
                 <Btn small style={{borderColor:T.blueBorder,color:T.blue}} onClick={e=>{e.stopPropagation();setExpanded(expanded===item.id?null:item.id);}}>📋 {(item.equipamentos||[]).length}</Btn>
+                <Btn small style={{borderColor:T.indigoBorder,color:T.indigo}} onClick={e=>{e.stopPropagation();setForm({...item,id:Date.now()+"",nome:(item.nome||"")+" (cópia)",equipamentos:(item.equipamentos||[]).map(eq=>({...eq,id:Date.now()+Math.random()}))});setExpanded(null);}}>⧉</Btn>
                 <Btn small onClick={e=>{e.stopPropagation();setForm({...item,equipamentos:item.equipamentos||[]})}}>✏️</Btn>
                 <Btn small danger onClick={e=>{e.stopPropagation();onDelete(item.id)}}>🗑️</Btn>
               </div>
@@ -1801,6 +1802,7 @@ function CadCriterios({ items, onSave, onDelete }) {
                       </div>
                     </div>
                     <div style={{display:"flex",gap:8}}>
+                      <Btn small style={{borderColor:T.indigoBorder,color:T.indigo}} onClick={()=>setForm({...empty,...item,id:Date.now()+"",nome:(item.nome||"")+" (cópia)"})}>⧉</Btn>
                       <Btn small onClick={()=>setForm({...empty,...item})}>✏️</Btn>
                       <Btn small danger onClick={()=>onDelete(item.id)}>🗑️</Btn>
                     </div>
@@ -1851,6 +1853,7 @@ function CadInstrumentos({ items, onSave, onDelete }) {
               <div style={{fontSize:12,color:T.textFaint,marginTop:2}}>{item.serie&&`Série: ${item.serie}`}{item.calibracao&&` · Calibração: ${fmtDate(item.calibracao)}`}</div>
             </div>
             <div style={{display:"flex",gap:8}}>
+              <Btn small style={{borderColor:T.indigoBorder,color:T.indigo}} onClick={()=>setForm({...item,id:Date.now()+"",tag:""})}>⧉</Btn>
               <Btn small onClick={()=>setForm({...item})}>✏️</Btn>
               <Btn small danger onClick={()=>onDelete(item.id)}>🗑️</Btn>
             </div>
@@ -1889,6 +1892,7 @@ function CadTecnicos({ items, onSave, onDelete }) {
               {item.crea&&<div style={{fontSize:12,color:T.textFaint,marginTop:2}}>CREA-PR {item.crea}</div>}
             </div>
             <div style={{display:"flex",gap:8}}>
+              <Btn small style={{borderColor:T.indigoBorder,color:T.indigo}} onClick={()=>setForm({...item,id:Date.now()+"",nome:(item.nome||"")+" (cópia)"})}>⧉</Btn>
               <Btn small onClick={()=>setForm({...item})}>✏️</Btn>
               <Btn small danger onClick={()=>onDelete(item.id)}>🗑️</Btn>
             </div>
